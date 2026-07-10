@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0C1016">
-<title>FilmCycling Computer v0.4.1</title>
+<title>FilmCycling Computer v0.4.2</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>
@@ -151,7 +151,7 @@
   <div id="entryTiles"></div>
   <div style="position:absolute;top:6%;width:100%;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35);z-index:2">
     <div style="font-size:clamp(24px,4.5vw,40px);font-weight:900">FilmCycling Computer</div>
-    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.4.1 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
+    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.4.2 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
   </div>
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;z-index:1">
     <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" style="width:min(980px,100%);display:block">
@@ -738,10 +738,19 @@ function sceneCard(i){
   const e=DB.episodes[CUR], x=e.scenes[i];
   const st=recStats(x);
   let body='';
+  const pEff=x.pagesA??x.pages;
   const hd=`<div class="hd"><span class="sno">S ${esc(x.no)}</span>
-      <span class="tag">${esc(x.dn)}</span><span class="loc">${esc(x.loc)}</span>
+      <span class="tag">${esc(x.dn)}</span>
+      <span class="tag" style="color:var(--ye)" id="pgT${i}">${pg8(pEff)}p</span>
+      <span class="loc">${esc(x.loc)}</span>
       ${x.retake?'<span class="pill risk">재촬영</span>':''}</div>
     <div class="desc">${esc(x.cast)}</div>`;
+  /* 페이지 — 기초 설정값이 그대로 연결. 현장 변경분 즉시 반영 */
+  const pageRow=`<div class="grid2" style="margin-top:8px;align-items:end">
+    <div><label class="f">페이지(1/8) — 기초 설정 ${pg8(x.pages)}p 연결</label><div class="stepper" style="height:34px">
+      <button onclick="stpPageA(${i},-1)">−</button><span class="val" style="color:var(--ye)" id="pgA${i}">${pg8(pEff)}</span><button onclick="stpPageA(${i},1)">＋</button></div></div>
+    <div class="hint" style="padding-bottom:8px">분량이 바뀌면 여기서 수정 — 결산 즉시 반영</div>
+  </div>`;
 
   if(x.shot==null){
     body=`<div style="display:flex;gap:8px;margin-top:8px">
@@ -777,7 +786,7 @@ function sceneCard(i){
         <input type="time" style="flex:1" value="${curS.t0||''}" title="셋업 시작 시각" onchange="scT0(${i},this.value)">
       </div>`;
       if(!closed){
-        body=timeRow+`
+        body=timeRow+pageRow+`
         <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px">
           <div style="font-size:12px;font-weight:800;margin-bottom:8px">셋업 <span style="color:var(--cy)">${su.length}</span>
             · 테이크 <span style="color:var(--ye)">${cur.length+1}</span></div>
@@ -793,7 +802,7 @@ function sceneCard(i){
           </div>
         </div>`;
       } else {
-        body=timeRow+`
+        body=timeRow+pageRow+`
         <div style="background:var(--panel2);border:1px solid var(--gn);border-radius:10px;padding:10px 12px;margin-top:8px">
           <div style="font-size:12px;font-weight:800;margin-bottom:8px;color:var(--gn)">셋업 ${su.length} OK ✓ — 다음 동작</div>
           <div style="display:flex;gap:8px">
@@ -859,7 +868,9 @@ function scReopen(i){ const x=DB.episodes[CUR].scenes[i]; x.done=false;
 function scRetake(i){ const x=DB.episodes[CUR].scenes[i]; x.retake=!x.retake; save(); paintScene(i); }
 function stpPageA(i,d){ const x=DB.episodes[CUR].scenes[i];
   x.pagesA=Math.max(0,(x.pagesA??x.pages)+d); save();
-  const el=document.getElementById('pgA'+i); if(el) el.textContent=pg8(x.pagesA); renderTotals(); }
+  const el=document.getElementById('pgA'+i); if(el) el.textContent=pg8(x.pagesA);
+  const t=document.getElementById('pgT'+i); if(t) t.textContent=pg8(x.pagesA)+'p';
+  renderTotals(); }
 
 function renderLive(e){
   const H=(k,l,v,type='time')=>`<div><label class="f">${l}</label><input type="${type}" value="${esc(v)}" onchange="updQ(e=>{${k}=this.value})"></div>`;
