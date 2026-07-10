@@ -1,0 +1,13 @@
+{
+  "name": "FilmCycling Computer",
+  "short_name": "FilmCycling",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0C1016",
+  "theme_color": "#0C1016",
+  "start_url": "./index.html",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
