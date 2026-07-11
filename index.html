@@ -6,9 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0C1016">
-<title>FilmCycling Computer v0.4.2</title>
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-180.png">
+<title>FilmCycling Computer v0.3</title>
 <style>
   :root{
     --bg:#0C1016; --panel:#151B24; --panel2:#1A222D; --line:#232B37; --ink:#F2F5F8; --sub:#7C8794;
@@ -151,7 +149,7 @@
   <div id="entryTiles"></div>
   <div style="position:absolute;top:6%;width:100%;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35);z-index:2">
     <div style="font-size:clamp(24px,4.5vw,40px);font-weight:900">FilmCycling Computer</div>
-    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.4.2 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
+    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.3 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
   </div>
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;z-index:1">
     <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" style="width:min(980px,100%);display:block">
@@ -280,7 +278,9 @@ const DEFAULT_SETTINGS={
   title:'슬리핑닥터', kind:'미니시리즈', genre:'현대물 (메디컬 일부)', epCount:'12부', epLen:70,
   budgetRange:'회당 10억 미만', btlPerEp:750000000, btlTotal:9000000000, leads:4, season:'S1',
   GF:1.05, ELF:1.0, LF:1.1, NF:1.05, LCF:1.05, SF:1.0,
-  stdPages:5, stdSetups:28, stdHours:12, stdBTL:750000000, writer:''
+  stdPages:5, stdSetups:28, stdHours:12, stdBTL:750000000, writer:'',
+  totalPages:0, crankUp:'', /* 대본 총 페이지 · 계획 크랭크업 (완성 예측용) */
+  units:[{name:'A',dpw:3,maxH:52}] /* 유닛 운영 — 주당 촬영일·주당 최대 촬영시간(주 52시간 기준, 휴게 포함) */
 };
 const VARCREWS=['무술','보조출연']; /* 그룹 체크. 배우는 개별(cast) */
 const NOTES6=['연출/제작','특효·CG·무술','조명·특수장비','미술·소품','의상·분장','저작권·마케팅'];
@@ -288,13 +288,37 @@ const NGC=[['01','연기'],['02','디렉션'],['03','기술'],['04','외부'],['
 const NGCOLOR={'01':'#E23A3A','02':'#FF7A00','03':'#FFD400','04':'#00B7D9','05':'#55606d'};
 const COSTS9=[['cast','출연료(주연·조연)'],['minor','단역·무술팀'],['extras','보조출연'],['vehicle','차량'],['equip','특수장비'],['location','장소임차료'],['art','미술·드레싱'],['lodging','숙박'],['etc','기타·자문']];
 const SHOTTYPES=['풀샷','그룹샷','단독샷','클로즈업','무빙샷','인서트','기타'];
+/* 씬 성격 분류 (씬분류·작품지표 기준 v0.1) — [코드, 표시명, SDI 가중치] */
+const KINDS=[['DLG','대사',1.0],['EMO','감정',1.3],['ACT','액션',1.8],['GRP','군중',1.5],['INS','인서트',0.7],['ETC','기타',1.0]];
+const KINDW=Object.fromEntries(KINDS.map(k=>[k[0],k[2]]));
+const KINDN=Object.fromEntries(KINDS.map(k=>[k[0],k[1]]));
+/* 씬 성격 자동 제안 — 내용·인물 텍스트 키워드 */
+function suggestKind(sc){
+  const t=(sc.desc||'')+' '+(sc.cast||'')+' '+(sc.prop||'')+' '+(sc.etc||'');
+  if(/무술|액션|싸움|추격|격투|스턴트|폭발|칼|총/.test(t)) return 'ACT';
+  if(/몽타주|인서트|경과|플래시백|발\b|손\b/.test(t)&&(sc.desc||'').length<20) return 'INS';
+  if(/눈물|오열|울|키스|포옹|고백|절규|분노/.test(t)) return 'EMO';
+  if(/보조출연|군중|시위|행인|관중|하객|환자들|학생들/.test(t)||/\/\/.*[0-9]명|\/\/.*들\)/.test(t)) return 'GRP';
+  return 'DLG';
+}
+/* 씬의 SDI 승수 (야간·로케 반영) */
+function sceneW(sc){
+  let w=KINDW[sc.kind]??1.0;
+  if(sc.dn==='N') w*=1.1;
+  if(sc.lso==='L') w*=1.15;
+  return w;
+}
 function nowHM(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 
 let DB=load();
 function load(){
-  try{ const d=JSON.parse(localStorage.getItem(LS_KEY)); if(d&&d.settings) return d; }catch(e){}
+  try{ const d=JSON.parse(localStorage.getItem(LS_KEY)); if(d&&d.settings){
+    if(!d.settings.units) d.settings.units=[{name:'A',dpw:3,maxH:52}];
+    if(d.settings.totalPages===undefined){ d.settings.totalPages=0; d.settings.crankUp=''; }
+    return d; } }catch(e){}
   return {settings:{...DEFAULT_SETTINGS}, episodes:{}};
 }
+const unitOf=key=>String(key).split('-')[0]||'A';
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(DB)); }
 function coef(s){ return s.GF*s.ELF*s.LF*s.NF*s.LCF*s.SF; }
 
@@ -355,6 +379,7 @@ function migrate(e){
     if(sc.done===undefined) sc.done=false;
     if(sc.retake===undefined) sc.retake=false;
     if(sc.pagesA===undefined) sc.pagesA=null; /* 실제 페이지(1/8). null=계획 따름 */
+    if(sc.kind===undefined) sc.kind=null;    /* 씬 성격 (DLG·EMO·ACT·GRP·INS·ETC) */
   });
   return e;
 }
@@ -475,7 +500,30 @@ function renderSet(){
     <h3 class="sec">회당 표준값</h3><div class="card"><div class="grid4">
       ${F('stdPages','계획 페이지','number')}${F('stdSetups','계획 셋업','number')}
       ${F('stdHours','정규 촬영시간(h)','number')}${F('stdBTL','BTL 표준(원)','number')}
-    </div></div>`;
+    </div></div>
+    <h3 class="sec">완성 예측 설정 (R1c)</h3><div class="card"><div class="grid2">
+      ${F('totalPages','대본 총 페이지 (p)','number')}${F('crankUp','계획 크랭크업','date')}
+    </div><div class="hint" style="margin-top:6px">총 페이지를 입력하면 결산 누적 탭에 진행률(PGR)과 예상 크랭크업(ECD)이 표시됩니다.</div></div>
+    <h3 class="sec">유닛 운영 — 주 52시간 기준</h3><div class="card">
+      <div style="display:flex;gap:10px;align-items:end;margin-bottom:10px">
+        <div style="flex:0 0 160px"><label class="f">유닛 수</label><div class="stepper">
+          <button onclick="setUnitCount(-1)">−</button><span class="val">${s.units.length}</span><button onclick="setUnitCount(1)">＋</button></div></div>
+        <div class="hint" style="padding-bottom:8px">회차 코드의 접두(A-nn, B-nn)로 유닛이 자동 식별됩니다.</div>
+      </div>
+      ${s.units.map((u,i)=>`<div class="grid3" style="margin-bottom:8px;align-items:end">
+        <div><label class="f">유닛</label><input type="text" value="${esc(u.name)}" onchange="DB.settings.units[${i}].name=this.value;save()"></div>
+        <div><label class="f">주당 촬영일</label><input type="number" inputmode="numeric" min="1" max="7" value="${u.dpw}" onchange="DB.settings.units[${i}].dpw=Math.max(1,parseInt(this.value)||3);save()"></div>
+        <div><label class="f">주당 최대 시간(h)</label><input type="number" inputmode="numeric" min="1" value="${u.maxH}" onchange="DB.settings.units[${i}].maxH=Math.max(1,parseInt(this.value)||52);save()"></div>
+      </div>`).join('')}
+      <div class="hint">기본 52h = 주 52시간 근로 기준(매일 휴게 2시간 포함 운영 통념). 유닛별 조정 가능.</div>
+    </div>`;
+}
+
+function setUnitCount(d){
+  const u=DB.settings.units;
+  if(d>0&&u.length<4) u.push({name:String.fromCharCode(65+u.length),dpw:3,maxH:52});
+  if(d<0&&u.length>1) u.pop();
+  save(); renderSet();
 }
 
 /* ---------- 임포트 ---------- */
@@ -487,12 +535,28 @@ function onFile(inp){
   rd.onload=e=>{
     try{
       IMPORT_WB=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:false});
+      /* 앱 export 파일 감지 → 회차 복원 */
+      const dws=IMPORT_WB.Sheets['_FCC_DATA'];
+      if(dws){
+        try{
+          let raw='', r=2;
+          while(dws['A'+r]){ raw+=dws['A'+r].v; r++; }
+          const pk=JSON.parse(raw);
+          if(pk.fcc&&pk.key&&pk.ep){
+            const exist=DB.episodes[pk.key];
+            DB.episodes[pk.key]=migrate(pk.ep); save();
+            alert(pk.key+' 회차를 복원했습니다'+(exist?' (기존 데이터 덮어씀)':'')+'. 결산 탭에서 확인하세요.');
+            openEp(pk.key); go('ep'); inp.value=''; return;
+          }
+        }catch(err){ alert('복원 데이터를 읽지 못했습니다: '+err.message); inp.value=''; return; }
+      }
       const list=document.getElementById('sheetList');
       list.innerHTML='';
       IMPORT_WB.SheetNames.forEach(sn=>{
-        const m=sn.match(/A-?(\d+)\s*회차/);
+        const m=sn.match(/([A-Za-z])-?(\d+)\s*회차/); /* A·B 등 유닛 접두 인식 */
         if(!m) return;
-        list.innerHTML+=`<button class="btn block" style="text-align:left;margin-bottom:6px" onclick="importSheet('${esc(sn)}')">${esc(sn)}${DB.episodes['A-'+m[1].padStart(2,'0')]?' <span class="pill warn">기존 회차 — 재임포트</span>':''}</button>`;
+        const key=m[1].toUpperCase()+'-'+m[2].padStart(2,'0');
+        list.innerHTML+=`<button class="btn block" style="text-align:left;margin-bottom:6px" onclick="importSheet('${esc(sn)}')">${esc(sn)}${DB.episodes[key]?' <span class="pill warn">기존 회차 — 재임포트</span>':''}</button>`;
       });
       if(!list.innerHTML) list.innerHTML='<div class="card">회차 시트(A-nn회차)를 찾지 못했습니다. 시트명 규칙을 확인하세요.</div>';
       go('sheetSel');
@@ -610,7 +674,7 @@ function parseSheet(ws){
 function importSheet(sn){
   const ws=IMPORT_WB.Sheets[sn];
   const ep=parseSheet(ws);
-  const m=sn.match(/A-?(\d+)/); const key='A-'+(m?m[1].padStart(2,'0'):'??');
+  const m=sn.match(/([A-Za-z])-?(\d+)/); const key=(m?m[1].toUpperCase():'A')+'-'+(m?m[2].padStart(2,'0'):'??');
   const dm=sn.match(/\((\d{2})\.(\d{2})\)/);
   ep.date= dm? `${new Date().getFullYear()}-${dm[1]}-${dm[2]}` : (ep.header.date||'');
   ep.srcSheet=sn;
@@ -677,9 +741,11 @@ function renderBase(e){
         <span class="tag">${esc(x.dn)}</span><span class="tag">${esc(x.lso)}</span>
         <span class="loc">${esc(x.loc)}</span></div>
       <div class="desc">${esc(x.cast)}${x.cast&&x.desc?' — ':''}${esc(x.desc)}</div>
-      <div style="margin-top:7px;max-width:280px">
-        <label class="f">페이지(1/8) ★</label><div class="stepper ${x.pages>0?'':'need'}" id="pgS${i}">
-          <button onclick="stpPage(${i},-1)">−</button><span class="val" style="color:var(--ye)" id="pg${i}">${pg8(x.pages)}</span><button onclick="stpPage(${i},1)">＋</button></div>
+      <div class="grid2" style="margin-top:7px;align-items:end">
+        <div><label class="f">페이지(1/8) ★</label><div class="stepper ${x.pages>0?'':'need'}" id="pgS${i}">
+          <button onclick="stpPage(${i},-1)">−</button><span class="val" style="color:var(--ye)" id="pg${i}">${pg8(x.pages)}</span><button onclick="stpPage(${i},1)">＋</button></div></div>
+        <div><label class="f">씬 성격 ★ ${x.kind?'':'(점선 = 자동 제안 — 탭하여 확정)'}</label>
+          <div id="kind${i}" style="display:flex;gap:4px;flex-wrap:wrap">${kindBtns(i,x)}</div></div>
       </div>
     </div>`;
   });
@@ -714,6 +780,21 @@ function renderBase(e){
     <h3 class="sec">팀별 특이사항</h3><div class="card">${nt}</div>
     ${cost? '<h3 class="sec">비용 참고 (임포트)</h3>'+cost : ''}`;
 }
+
+/* 씬 성격 버튼 (자동 제안 = 점선 강조) */
+function kindBtns(i,x){
+  const sug = x.kind? null : suggestKind(x);
+  return KINDS.map(([c,n])=>{
+    const on = x.kind===c;
+    const isSug = !x.kind && sug===c;
+    const st = on? 'background:var(--cy);color:#0C1016;border:1px solid var(--cy)'
+      : isSug? 'background:var(--panel2);color:var(--cy);border:1.5px dashed var(--cy)'
+      : 'background:var(--panel2);color:var(--sub);border:1px solid var(--line)';
+    return `<button style="${st};border-radius:6px;padding:6px 8px;font-size:12px;font-weight:800;cursor:pointer" onclick="setKind(${i},'${c}')">${n}</button>`;
+  }).join('');
+}
+function setKind(i,c){ const x=DB.episodes[CUR].scenes[i]; x.kind = x.kind===c? null : c; save();
+  const el=document.getElementById('kind'+i); if(el) el.innerHTML=kindBtns(i,x); renderTotals(); }
 
 /* 표적 갱신 스테퍼 — 화면 재생성 없음(스크롤 유지) */
 function stpPage(i,d){ const sc=DB.episodes[CUR].scenes[i]; sc.pages=Math.max(0,(sc.pages||0)+d); save();
@@ -998,6 +1079,29 @@ function metricsOf(e){
         m.suByType[ty].n+=v.n; m.suByType[ty].min+=v.min; }); } });
   m.suAvgMin = m.suMinAll.length? m.suMinAll.reduce((a,b)=>a+b,0)/m.suMinAll.length : null;
   m.suMaxMin = m.suMinAll.length? Math.max(...m.suMinAll) : null;
+  /* R1b — 씬 성격: 대본 프로파일(SDI)·유형별 효율 */
+  m.byKind={}; let sdiNum=0, sdiDen=0;
+  e.scenes.forEach(x=>{
+    const pEff=((x.pagesA??x.pages)||0)/8;
+    if(x.kind&&pEff>0){ sdiNum+=pEff*sceneW(x); sdiDen+=pEff; }
+    if(x.shot!=='Y') return;
+    const k=x.kind||'미분류';
+    if(!m.byKind[k]) m.byKind[k]={pg:0,h:0,setups:0,suMin:0,suN:0,takes:0,ng:0,scenes:0};
+    const b=m.byKind[k], st=recStats(x);
+    b.scenes++; b.pg+=pEff;
+    const dh=hdiff(x.tStart,x.tEnd); if(dh!=null) b.h+=dh;
+    b.setups+=st.setups||0;
+    if(st.suMin) st.suMin.forEach(mn=>{b.suMin+=mn;b.suN++;});
+    if(!st.legacy){ b.takes+=st.takes; b.ng+=st.ngSum; }
+  });
+  m.sdi = sdiDen>0? sdiNum/sdiDen : null;
+  m.dppAdj = (m.dpp!=null&&m.sdi!=null)? m.dpp*m.sdi : null;
+  m.kindDone = e.scenes.filter(x=>x.kind).length;
+  /* R1a — NG 책임 분해 */
+  m.ng01=m.ngAll['01']||0; m.ng02=m.ngAll['02']||0; m.ng03=m.ngAll['03']||0;
+  m.dNGR = m.takes? m.ng02/m.takes : null; /* 연출 */
+  m.tNGR3 = m.takes? m.ng03/m.takes : null; /* 기술(스태프) */
+  m.scenePace = (m.scenesY&&m.shootH)? m.shootH/m.scenesY : null; /* 씬당 소요 h */
   /* 비용 */
   const cost=costTotal(e);
   const nEp=parseInt(DB.settings.epCount)||12;
@@ -1047,6 +1151,70 @@ function sriApprox(dpp,spi,otr,ngr){
   if(dpp!=null){ if(dpp<5)s+=0.10; }
   if(ngr!=null){ if(ngr>0.30)s+=0.10; }
   return Math.min(0.95,s);
+}
+/* R1a — 배우별 지표 집계 (eps: [{k,e}] 배열) */
+function actorStats(eps){
+  const map={};
+  eps.forEach(({e})=>{
+    migrate(e);
+    (e.cast||[]).forEach(c=>{
+      if(!map[c.name]) map[c.name]={name:c.name,scenes:0,takes:0,ng01:0,ftc:0,setups:0,delays:[]};
+      if(c.planT&&c.tIn) map[c.name].delays.push(toMin(c.tIn)-toMin(c.planT));
+    });
+    e.scenes.forEach(x=>{
+      if(x.shot!=='Y') return;
+      const st=recStats(x);
+      Object.keys(map).forEach(nm=>{
+        if(!x.cast||!x.cast.includes(nm)) return;
+        const a=map[nm]; a.scenes++;
+        if(!st.legacy){ a.takes+=st.takes; a.ng01+=(st.ng['01']||0); a.ftc+=st.ftc; a.setups+=st.setups; }
+      });
+    });
+  });
+  return Object.values(map).filter(a=>a.scenes>0||a.delays.length)
+    .map(a=>({...a,
+      aNGR:a.takes?a.ng01/a.takes:null,
+      aFTC:a.setups?a.ftc/a.setups:null,
+      delay:a.delays.length?a.delays.reduce((x,y)=>x+y,0)/a.delays.length:null}))
+    .sort((x,y)=>y.scenes-x.scenes);
+}
+/* 셋업 단위 상세 행 수집 (ep 필수, epKey는 누적 표기용) */
+function setupRows(e,epKey){
+  const rows=[];
+  (e.scenes||[]).forEach(x=>{
+    if(x.shot!=='Y'||!x.rec) return;
+    x.rec.setups.forEach((su,si)=>{
+      const d=hdiff(su.t0,su.t1);
+      if(d==null) return;
+      rows.push({ep:epKey||'', sc:x.no, si:si+1, ty:su.type||'미지정', min:Math.round(d*60), tk:(su.takes||[]).length});
+    });
+  });
+  return rows;
+}
+/* 셋업 상세 목록 HTML — avg 기준 병목 강조 */
+function setupListHTML(rows,avg){
+  if(!rows.length) return '';
+  const maxMin=Math.max(...rows.map(r=>r.min),1);
+  return rows.map(r=>{
+    const w=Math.max(4,Math.round(r.min/maxMin*100));
+    const over=avg>0&&r.min>avg*1.5;
+    return `<div style="padding:7px 0;border-bottom:1px dashed var(--line)">
+      <div style="display:flex;justify-content:space-between;font-size:13.5px">
+        <span>${r.ep?'<b style="color:var(--or)">'+esc(r.ep)+'</b> · ':''}<b style="color:var(--cy)">S ${esc(r.sc)}</b> · 셋업${r.si} <span class="tag" style="margin-left:3px">${esc(r.ty)}</span></span>
+        <b style="${over?'color:var(--rd)':''}">${r.min}분 · ${r.tk}테이크</b></div>
+      <div style="height:7px;border-radius:4px;background:${over?'var(--rd)':'var(--cy)'};width:${w}%;margin-top:4px"></div></div>`;
+  }).join('');
+}
+/* R1b — 유형별 효율 표 HTML */
+function kindTable(byKind){
+  const ks=Object.entries(byKind).filter(([,b])=>b.scenes>0);
+  if(!ks.length) return '';
+  return '<div class="card">'+ks.sort((a,b)=>b[1].pg-a[1].pg).map(([k,b])=>{
+    const pace=b.h>0? (b.pg/b.h).toFixed(2)+' p/h':'–';
+    const sst=b.suN? (b.suMin/b.suN).toFixed(0)+'분':'–';
+    const ngr=b.takes? Math.round(b.ng/b.takes*100)+'%':'–';
+    return `<div class="rrow"><span><b>${esc(KINDN[k]||k)}</b> ${b.scenes}씬 · ${b.pg.toFixed(1)}p</span><b>페이스 ${pace} · 셋업 ${sst} · NG ${ngr}</b></div>`;
+  }).join('')+'</div>';
 }
 function mcell(lbl,val,unit,band,zone){
   const z=zone? `<span class="pill" style="margin-left:5px;font-size:11px">${zone[0]}</span>`:'';
@@ -1105,6 +1273,27 @@ function renderResult(e){
         ${mcell('NG 총 / 씬당', m.ngSum, m.ngScene!=null?'· '+fmtN(m.ngScene):'', 'var(--rd)', null)}
         ${mcell('씬 촬영/미촬영', m.scenesY, '/'+m.scenesN, 'var(--gn)', null)}
       </div>
+      <h3 class="sec">대본 프로파일 — 씬 성격 (R1b)</h3>
+      ${m.kindDone<e.scenes.length? '<div class="hint" style="margin-bottom:7px">미분류 '+(e.scenes.length-m.kindDone)+'씬 — 기초 탭에서 성격을 지정하면 SDI·유형별 효율이 정확해집니다.</div>':''}
+      <div class="fgrid">
+        ${mcell('SDI · 대본 난이도', fmtN(m.sdi,2), '', 'var(--bl)', null)}
+        ${mcell('DPP-adj · 보정 산출', fmtN(m.dppAdj,1), 'p', 'var(--or)', null)}
+        ${mcell('분류 완료', m.kindDone, '/'+e.scenes.length+'씬', 'var(--cy)', null)}
+        ${mcell('SDI 기준', '1.00', '=표준 대사씬', 'var(--gn)', null)}
+      </div>
+      ${kindTable(m.byKind)}
+      ${(()=>{const as=actorStats([{e}]).slice(0,8);
+        if(!as.length) return '';
+        return '<h3 class="sec">역할별 — 배우 (R1a)</h3><div class="card">'+as.map(a=>
+          `<div class="rrow"><span><b>${esc(a.name)}</b> ${a.scenes}씬</span><b>연기NG ${a.aNGR==null?'–':Math.round(a.aNGR*100)+'%'} · 1테이크 ${a.aFTC==null?'–':Math.round(a.aFTC*100)+'%'} · 콜 ${a.delay==null?'–':(a.delay<=0?'정시':'+'+Math.round(a.delay)+'분')}</b></div>`).join('')+
+          '<div class="hint" style="margin-top:6px">개인 지표 — 거버넌스 6원칙(본인 열람 우선·외부 공개 금지) 적용 대상</div></div>';})()}
+      <h3 class="sec">역할별 — 연출 · 스태프 (R1a)</h3>
+      <div class="fgrid">
+        ${mcell('연출 dNGR · 디렉션NG', m.dNGR==null?'–':(m.dNGR*100).toFixed(0), '%', 'var(--or)', null)}
+        ${mcell('연출 씬당 소요', fmtN(m.scenePace,1), 'h', 'var(--ye)', null)}
+        ${mcell('스태프 tNGR · 기술NG', m.tNGR3==null?'–':(m.tNGR3*100).toFixed(0), '%', 'var(--cy)', null)}
+        ${mcell('스태프 SST 평균', fmtN(m.suAvgMin,0), '분', 'var(--bl)', null)}
+      </div>
       <h3 class="sec">셋업 시간 — 촬영·조명 효율 (자동 측정)</h3>
       <div class="fgrid">
         ${mcell('평균 셋업 시간', fmtN(m.suAvgMin,0), '분', 'var(--cy)', null)}
@@ -1116,6 +1305,13 @@ function renderResult(e){
         Object.entries(m.suByType).sort((a,b)=>b[1].min/b[1].n-a[1].min/a[1].n).map(([ty,v])=>
           `<div class="rrow"><span>${esc(ty)}</span><b>${v.n}회 · 평균 ${(v.min/v.n).toFixed(0)}분</b></div>`).join('')+
         '<div class="hint" style="margin-top:6px">샷 종류별 평균 셋업 소요 — 촬영·조명팀 효율 신호</div></div>':''}
+      ${(()=>{ /* 샷별 셋업 시간 상세 (당일) */
+        const rows=setupRows(e,'');
+        if(!rows.length) return '';
+        const avg=m.suAvgMin||0;
+        return `<h3 class="sec">샷별 셋업 시간 상세 (${rows.length}셋업)</h3><div class="card">${setupListHTML(rows,avg)}
+          <div class="hint" style="margin-top:8px">빨간 바 = 당일 평균(${avg?avg.toFixed(0):'–'}분)의 1.5배 초과 — 병목 셋업. 바 길이는 최장 셋업 대비 비율.</div></div>`;
+      })()}
       <h3 class="sec">자원 — 비용</h3>
       <div class="fgrid">
         ${mcell('당일 BTL 합', costTotal(e)?Math.round(costTotal(e)/10000).toLocaleString():'–', '만원', 'var(--ye)', null)}
@@ -1198,9 +1394,87 @@ function renderResult(e){
         ${mcell('콜투랩 평균', fmtN(aC2w), 'h', 'var(--ye)', null)}
         ${mcell('평균 셋업 시간', fmtN(aSuMin,0), '분', 'var(--cy)', null)}
       </div>
+      ${(()=>{ /* ===== R1c 완성 예측 ===== */
+        const s=DB.settings;
+        if(!(s.totalPages>0)) return '<h3 class="sec">완성 예측 (R1c)</h3><div class="card hint">작품 설정에 「대본 총 페이지」를 입력하면 진행률·예상 크랭크업이 표시됩니다.</div>';
+        const shotAll=all.reduce((a,x)=>a+(x.m.pgShot||0),0);
+        const pgr=shotAll/s.totalPages;
+        const remain=Math.max(0,s.totalPages-shotAll);
+        const dppOf=arr=>{const v=arr.map(x=>x.m.dpp).filter(x=>x!=null&&x>0);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
+        const d4=dppOf(rec.slice(-4)), d8=dppOf(rec.slice(-8)), dA=dppOf(rec);
+        /* 달력 환산 계수: 촬영일 간 평균 간격(일) */
+        const dates=rec.map(x=>DB.episodes[x.k].date).filter(Boolean).sort();
+        let fac=2.0, lastD=dates.length?new Date(dates[dates.length-1]):new Date();
+        if(dates.length>=2){ fac=Math.max(1,(new Date(dates[dates.length-1])-new Date(dates[0]))/(dates.length-1)/86400000); }
+        const delayOf=ecd=>{ if(!s.crankUp) return '';
+          const dd=Math.round((ecd-new Date(s.crankUp))/86400000);
+          return ` <span style="color:${dd>0?'var(--rd)':'var(--gn)'}">(계획 대비 ${dd>0?'+':''}${dd}일)</span>`; };
+        let scen=[['낙관 (최근 4회 페이스)',d4],['중립 (최근 8회)',d8],['보수 (전체 평균)',dA]].map(([nm,d])=>{
+          if(!d) return `<div class="rrow"><span>${nm}</span><b>–</b></div>`;
+          const rsd=Math.ceil(remain/d);
+          const ecd=new Date(lastD.getTime()+rsd*fac*86400000);
+          return `<div class="rrow"><span>${nm}</span><b>잔여 ${rsd}일 → ${ecd.toISOString().slice(0,10)}${delayOf(ecd)}</b></div>`;
+        }).join('');
+        /* 용량 기준 — 유닛 주 52시간 운영 상한 */
+        const totH=rec.reduce((a,x)=>a+(x.m.c2w||x.m.shootH||0),0);
+        const pPerH=totH>0? rec.reduce((a,x)=>a+(x.m.pgShot||0),0)/totH : null;
+        const weekCap=(s.units||[]).reduce((a,u)=>a+(u.maxH||52),0);
+        if(pPerH&&weekCap>0){
+          const needH=remain/pPerH, weeks=needH/weekCap;
+          const ecd=new Date(Date.now()+weeks*7*86400000);
+          scen+=`<div class="rrow"><span><b style="color:var(--cy)">용량 기준</b> (${(s.units||[]).length}유닛 · 주 ${weekCap}h 상한)</span><b>필요 ${Math.ceil(needH)}h ≈ ${weeks.toFixed(1)}주 → ${ecd.toISOString().slice(0,10)}${delayOf(ecd)}</b></div>`;
+        }
+        return `<h3 class="sec">완성 예측 (R1c) — 매 회차 자동 갱신</h3>
+        <div class="fgrid">
+          ${mcell('PGR · 진행률', (pgr*100).toFixed(1), '%', 'var(--or)', null)}
+          ${mcell('촬영 완료', fmtN(shotAll), '/'+s.totalPages+'p', 'var(--gn)', null)}
+          ${mcell('잔여 분량', fmtN(remain), 'p', 'var(--ye)', null)}
+          ${mcell('촬영일 간격 실측', fac.toFixed(1), '일', 'var(--cy)', null)}
+        </div>
+        <div class="card">${scen}
+        <div class="hint" style="margin-top:6px">유형별 페이스 분해 예측(대본 전체 씬 분류 필요)은 잔여 회차 임포트가 쌓이면 자동 정밀화. 시나리오 폭 = 불확실성.</div></div>`;
+      })()}
+      ${(()=>{ /* ===== 유닛별 효용성 (UUR) ===== */
+        const s=DB.settings, byU={};
+        all.forEach(x=>{ const u=unitOf(x.k);
+          if(!byU[u]) byU[u]={n:0,dpp:[],hByWeek:{}};
+          const b=byU[u]; b.n++;
+          if(x.m.dpp!=null) b.dpp.push(x.m.dpp);
+          const h=x.m.c2w||x.m.shootH;
+          const dt=DB.episodes[x.k].date;
+          if(h&&dt){ const d=new Date(dt); const wk=d.getFullYear()+'-W'+Math.ceil(((d-new Date(d.getFullYear(),0,1))/86400000+1)/7);
+            b.hByWeek[wk]=(b.hByWeek[wk]||0)+h; } });
+        const us=Object.entries(byU);
+        if(!us.length) return '';
+        const rows=us.map(([u,b])=>{
+          const conf=(s.units||[]).find(x=>x.name===u)||{maxH:52};
+          const wks=Object.values(b.hByWeek);
+          const wAvg=wks.length? wks.reduce((a,c)=>a+c,0)/wks.length : null;
+          const uur=wAvg!=null? wAvg/conf.maxH : null;
+          const dppAvg=b.dpp.length? b.dpp.reduce((a,c)=>a+c,0)/b.dpp.length : null;
+          const z= uur==null?'' : uur<0.60?'<span class="pill warn">여유</span>' : uur<=0.85?'<span class="pill ok">정상</span>' : '<span class="pill risk">과부하</span>';
+          return `<div class="rrow"><span><b>${esc(u)}유닛</b> ${b.n}회차</span><b>DPP ${dppAvg==null?'–':dppAvg.toFixed(1)}p · 주평균 ${wAvg==null?'–':wAvg.toFixed(0)}h/${conf.maxH}h · UUR ${uur==null?'–':(uur*100).toFixed(0)+'%'} ${z}</b></div>`;
+        }).join('');
+        return '<h3 class="sec">유닛별 효용성 — UUR (주 52시간 기준)</h3><div class="card">'+rows+
+          '<div class="hint" style="margin-top:6px">UUR = 주평균 실촬영시간(콜투랩) ÷ 유닛 주당 상한. 여유(<60%)·정상(60~85%)·과부하(>85%)</div></div>';
+      })()}
+      ${(()=>{const as=actorStats(win.map(x=>({e:DB.episodes[x.k]}))).slice(0,10);
+        if(!as.length) return '';
+        return '<h3 class="sec">역할별 — 배우 누적 (집계 창)</h3><div class="card">'+as.map(a=>
+          `<div class="rrow"><span><b>${esc(a.name)}</b> ${a.scenes}씬</span><b>연기NG ${a.aNGR==null?'–':Math.round(a.aNGR*100)+'%'} · 1테이크 ${a.aFTC==null?'–':Math.round(a.aFTC*100)+'%'} · 콜지연 평균 ${a.delay==null?'–':(a.delay<=0?'정시':'+'+Math.round(a.delay)+'분')}</b></div>`).join('')+'</div>';})()}
       ${Object.keys(cumByType).length? '<h3 class="sec">샷 종류별 평균 셋업 시간 (누적)</h3><div class="card">'+
         Object.entries(cumByType).sort((a,b)=>b[1].min/b[1].n-a[1].min/a[1].n).map(([ty,v])=>
           `<div class="rrow"><span>${esc(ty)}</span><b>${v.n}회 · 평균 ${(v.min/v.n).toFixed(0)}분</b></div>`).join('')+'</div>':''}
+      ${(()=>{ /* 샷별 셋업 시간 — 누적 병목 상위 (집계 창) */
+        let rows=[];
+        win.forEach(x=>{ rows=rows.concat(setupRows(DB.episodes[x.k], x.k)); });
+        if(!rows.length) return '';
+        const avg=rows.reduce((a,r)=>a+r.min,0)/rows.length;
+        const top=rows.sort((a,b)=>b.min-a.min).slice(0,15);
+        return `<h3 class="sec">샷별 셋업 시간 — 병목 상위 (집계 창 ${rows.length}셋업 중 15)</h3>
+          <div class="card">${setupListHTML(top,avg)}
+          <div class="hint" style="margin-top:8px">집계 창 전체 셋업을 소요 시간순으로 정렬한 상위 목록. 빨간 바 = 창 평균(${avg.toFixed(0)}분)의 1.5배 초과. 회차별 전체 상세는 당일 결산에서.</div></div>`;
+      })()}
       <h3 class="sec">회차별 페이지 (밝음 = 집계 창 · 주황 = 현장 기록)</h3>
       <div class="card"><svg width="100%" height="86" viewBox="0 0 ${W} ${H+16}" preserveAspectRatio="none">${bars}</svg></div>
       <div class="hint">SRI는 백테스트 전 가설 가중치의 근사값(DPP·SPI·OTR·NGR 합성). 컷 기반 지표(CPD·ASD·PCR)와 장비(EUR)는 촬영 메타 임포트(2단계)에서 자동 산출.</div>`;
@@ -1261,7 +1535,7 @@ function exportXlsx(){
     A10:'[실제] 집결',B10:e.actual.gather||'',C10:'콜시작',D10:e.actual.call||'',F10:'종료',G10:e.actual.end||'',H10:'휴게(h)',I10:e.actual.rest??'',
     A12:'■ 씬 기록',
     A13:'회',B13:'#S',C13:'D/N',D13:'L/S/O',E13:'장소',F13:'인물 / 내용',G13:'계획 페이지',H13:'실제 페이지',
-    I13:'촬영여부',J13:'시작',K13:'종료',L13:'셋업',M13:'테이크',N13:'OK',O13:'NG',P13:'재촬영',Q13:'셋업별 기록'};
+    I13:'촬영여부',J13:'시작',K13:'종료',L13:'셋업',M13:'테이크',N13:'OK',O13:'NG',P13:'재촬영',Q13:'셋업별 기록',R13:'씬 성격'};
   e.scenes.forEach((x,i)=>{
     const r=14+i, st=recStats(x);
     d['A'+r]=x.ep; d['B'+r]=x.no; d['C'+r]=x.dn; d['D'+r]=x.lso; d['E'+r]=x.loc;
@@ -1275,6 +1549,7 @@ function exportXlsx(){
       const dd=hdiff(su.t0,su.t1), tag=[su.type,dd!=null?Math.round(dd*60)+'분':''].filter(Boolean).join('|');
       return 'S'+(si+1)+(tag?'['+tag+']':'')+':'+(su.takes||[]).map(t=>t==='OK'?'O':'N('+t+')').join('·');
     }).join(' / '):'';
+    d['R'+r]=x.kind? (KINDN[x.kind]||x.kind):'';
   });
   let r=14+e.scenes.length+1;
   const M=metricsOf(e);
@@ -1285,7 +1560,7 @@ function exportXlsx(){
   NGC.forEach(([c,n],i)=>{ d[XLSX.utils.encode_cell({r:r+1,c:6+i})]=n; d[XLSX.utils.encode_cell({r:r+2,c:6+i})]=M.ngAll[c]||0; });
   const IX=[['DPP',M.dpp],['SPI',M.spi],['SPD',M.spd],['SPP',M.spp],['OTR',M.otr],['CTA 지연(분)',M.callDelay],
     ['TPS',M.tps],['NGR',M.ngr],['OKR',M.okr],['FTC',M.ftc],['RTR',M.rtr],['BUR(%p)',M.bur],
-    ['평균 셋업시간(분)',M.suAvgMin],['최장 셋업(분)',M.suMaxMin]];
+    ['평균 셋업시간(분)',M.suAvgMin],['최장 셋업(분)',M.suMaxMin],['SDI 난이도',M.sdi],['DPP-adj',M.dppAdj]];
   d['A'+(r+4)]='■ 지표';
   IX.forEach(([k,v],i)=>{ const rr=r+5+Math.floor(i/6), cc=(i%6)*2;
     d[XLSX.utils.encode_cell({r:rr-1,c:cc})]=k;
@@ -1324,6 +1599,12 @@ function exportXlsx(){
     A6:'04',B6:'외부',C6:'통제 불가 외부 요인',D6:'비행기 소리, 행인 난입, 기상 변화',E6:'1AD (관리)',
     A7:'05',B7:'기타',C7:'위 4종에 해당하지 않는 사유',D7:'장비 고장, 출연자 불참, 안전 문제',E7:'1AD / 제작팀'};
   XLSX.utils.book_append_sheet(wb, mk(ng), 'NG_사유_코드체계');
+
+  /* 데이터 원본 내장 — 이 파일을 다른 기기의 앱에 임포트하면 회차가 그대로 복원됨 */
+  const raw=JSON.stringify({fcc:1, key:CUR, ep:e});
+  const chunks={A1:'FCC_EPISODE_DATA v1 — 이 시트는 앱 복원용입니다. 수정하지 마세요.'};
+  for(let i=0;i<raw.length;i+=30000) chunks['A'+(2+Math.floor(i/30000))]=raw.slice(i,i+30000);
+  XLSX.utils.book_append_sheet(wb, mk(chunks), '_FCC_DATA');
 
   XLSX.writeFile(wb, s.title+'_제작일지_'+CUR+'_v2.xlsx');
 }
