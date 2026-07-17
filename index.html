@@ -32,6 +32,7 @@
   #ep{--acc:var(--cy);}
   #ep[data-theme=base]{--acc:var(--cy);}
   #ep[data-theme=live]{--acc:var(--or);}
+  #ep[data-theme=check]{--acc:var(--bl);}
   #ep[data-theme=result]{--acc:var(--gn);}
   h3.sec{font-size:14px;font-weight:800;color:var(--ink);margin:20px 0 9px;padding-left:10px;border-left:4px solid var(--acc,var(--or));letter-spacing:.02em;}
   .hint{font-size:12.5px;color:var(--sub);line-height:1.6;}
@@ -93,6 +94,7 @@
   .tab{flex:1;text-align:center;padding:11px 0;font-size:15.5px;font-weight:800;color:var(--sub);cursor:pointer;border-bottom:3px solid transparent;}
   .tab[data-t=base].on{color:var(--cy);border-bottom-color:var(--cy);background:rgba(0,183,217,.08);}
   .tab[data-t=live].on{color:var(--or);border-bottom-color:var(--or);background:rgba(255,122,0,.08);}
+  .tab[data-t=check].on{color:var(--bl);border-bottom-color:var(--bl);background:rgba(61,123,255,.08);}
   .tab[data-t=result].on{color:var(--gn);border-bottom-color:var(--gn);background:rgba(53,194,77,.08);}
 
   /* 씬 카드 — 컴팩트 */
@@ -236,7 +238,8 @@
     <span class="right"><span class="back" onclick="saveAndHome()" style="color:var(--cy);cursor:pointer;font-weight:700">◀ 홈</span></span></div>
   <div class="tabs">
     <div class="tab on" data-t="base" onclick="epTab('base')">기초</div>
-    <div class="tab" data-t="live" onclick="epTab('live')">현장</div>
+    <div class="tab" data-t="live" onclick="epTab('live')">씬 기록</div>
+    <div class="tab" data-t="check" onclick="epTab('check')">체크</div>
     <div class="tab" data-t="result" onclick="epTab('result')">결산</div>
   </div>
   <div class="wrap">
@@ -343,7 +346,7 @@ function hdiff(t1,t2){
   const [a,b]=t1.split(':').map(Number), [c,d]=t2.split(':').map(Number);
   let h=(c+d/60)-(a+b/60); if(h<0)h+=24; return h;
 }
-function pg8(e){ if(!e) return '0'; const w=Math.floor(e/8), f=e%8; return ((w?w+' ':'')+(f? f+'/8':'')).trim()||String(w); }
+function pg8(v){ return (+v||0).toFixed(1); } /* v0.7: 소수 페이지 표시 (스케줄표 단위) */
 function ngTotal(sc){ return Object.values(sc.ng||{}).reduce((a,b)=>a+b,0); }
 function toMin(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
 /* 콜타임 원문 → 배우별 계획 콜 목록 */
@@ -380,7 +383,19 @@ function migrate(e){
     if(sc.retake===undefined) sc.retake=false;
     if(sc.pagesA===undefined) sc.pagesA=null; /* 실제 페이지(1/8). null=계획 따름 */
     if(sc.kind===undefined) sc.kind=null;    /* 씬 성격 (DLG·EMO·ACT·GRP·INS·ETC) */
+    if(sc.linked===undefined) sc.linked=false; /* 앞 씬과 연결 촬영 */
+    if(sc.note===undefined) sc.note='';        /* 비고 (플래시백 활용·미촬영 사유 등) */
   });
+  /* v0.7 — 페이지 단위 전환: 1/8 정수 → 소수 페이지 */
+  if(!e.pgV2){
+    (e.scenes||[]).forEach(sc=>{
+      if(typeof sc.pages==='number') sc.pages=+(sc.pages/8).toFixed(3);
+      if(sc.pagesA!=null) sc.pagesA=+(sc.pagesA/8).toFixed(3);
+    });
+    e.pgV2=true;
+  }
+  if(e.varCrew&&e.varCrew['보조출연']&&!e.varCrew['보조출연'].batches) e.varCrew['보조출연'].batches=[];
+  if(!e.breaks) e.breaks=[]; /* 휴게·중단 기록 [{t0,t1,memo}] */
   return e;
 }
 /* 테크트리 기록 → 파생 수치 */
@@ -460,7 +475,7 @@ function renderHome(){
   document.getElementById('homeWork').textContent=s.title;
   document.getElementById('homeDate').textContent=new Date().toISOString().slice(0,10);
   let totPg=0, days=0;
-  eps.forEach(k=>{ const e=DB.episodes[k]; const p=e.scenes.reduce((a,sc)=>a+(sc.pages||0),0)/8; if(p>0){totPg+=p;days++;} });
+  eps.forEach(k=>{ const e=DB.episodes[k]; const p=e.scenes.reduce((a,sc)=>a+(sc.pages||0),0); if(p>0){totPg+=p;days++;} });
   const dpp=days? (totPg/days).toFixed(1):'–';
   document.getElementById('entDpp').textContent=dpp;
   document.getElementById('entEp').textContent=eps.length||'–';
@@ -473,7 +488,7 @@ function renderHome(){
   el.innerHTML = eps.length? '' : '<div class="card hint">회차가 없습니다. 아래에서 사전제작일지를 임포트하세요.</div>';
   eps.forEach(k=>{
     const e=migrate(DB.episodes[k]);
-    const pg=e.scenes.reduce((a,sc)=>a+(sc.pages||0),0)/8;
+    const pg=e.scenes.reduce((a,sc)=>a+(sc.pages||0),0);
     const [st,cl]=epStatus(e);
     el.innerHTML+=`<div class="epcard" onclick="openEp('${k}')">
       <span class="no">${k}</span>
@@ -614,18 +629,22 @@ function parseSheet(ws){
       else if(lb==='L/S/O')colMap.lso=c; else if(lb==='장소')colMap.loc=c; else if(lb==='인물')colMap.cast=c;
       else if(lb==='내용')colMap.desc=c; else if(lb==='시간')colMap.time=c;
       else if(lb.includes('준비')||lb.includes('소품'))colMap.prop=c; else if(lb==='기타')colMap.etc=c;
+      else if(lb.includes('페이지'))colMap.pg=c; /* v0.7: 일지에 페이지 열 추가 시 자동 임포트 */
     }
     for(let r=hr+1;r<r1;r++){
       const s=cell(r,colMap.s);
       if(s==null||String(s).trim()==='') continue;
+      let pg=0;
+      if(colMap.pg!=null){ const pv=parseFloat(cell(r,colMap.pg)); if(!isNaN(pv)&&pv>=0) pg=pv; }
       ep.scenes.push({
         ep:cell(r,colMap.ep)||'', no:String(s), dn:String(cell(r,colMap.dn)||''), lso:String(cell(r,colMap.lso)||''),
         loc:String(cell(r,colMap.loc)||''), cast:String(cell(r,colMap.cast)||''), desc:String(cell(r,colMap.desc)||''),
         prop:String(cell(r,colMap.prop)||''), etc:String(cell(r,colMap.etc)||''),
-        pages:0, setups:0, tStart:'', tEnd:'', shot:null, ng:{},
-        rec:null, done:false, retake:false, pagesA:null
+        pages:pg, setups:0, tStart:'', tEnd:'', shot:null, ng:{},
+        rec:null, done:false, retake:false, pagesA:null, kind:null, linked:false, note:''
       });
     }
+    if(colMap.pg!=null) res.ok.pages='페이지 열 자동 임포트';
     res.ok.scenes='씬 '+ep.scenes.length+'개';
   }catch(e){ res.warn.scenes='씬 테이블 탐지 실패'; }
 
@@ -655,13 +674,20 @@ function parseSheet(ws){
     anchors.forEach((sec,idx)=>{
       const label=secs.find(([a])=>a===sec.a)[1];
       const rEnd = idx+1<anchors.length? anchors[idx+1].r : Math.min(sec.r+14, rows);
-      const hr=sec.r+1; let cs=[];
-      for(let c=0;c<cols;c++){ const lb=String(cell(hr,c)||''); if((lb.includes('출연료')||lb.includes('금액'))&&!lb.includes('누적')) cs.push(c); }
-      let sum=0;
+      const hr=sec.r+1; let cs=[], sums=[], nCol=null;
+      /* v0.7: '합계' 열이 있으면 그 열만 (누적 제외) — 보조출연 단가 오집계 수정 */
+      for(let c=0;c<cols;c++){ const lb=String(cell(hr,c)||'');
+        if(lb.includes('합계')&&!lb.includes('누적')) sums.push(c);
+        if((lb.includes('출연료')||lb.includes('금액'))&&!lb.includes('누적')) cs.push(c);
+        if(lb.replace(/\s/g,'')==='인원') nCol=c; }
+      const useCols=sums.length? sums : cs;
+      let sum=0, nSum=0;
       for(let rr=hr+1;rr<rEnd;rr++){
-        cs.forEach(c=>{ const v=cell(rr,c); if(typeof v==='number'&&v>1000) sum+=v; });
+        useCols.forEach(c=>{ const v=cell(rr,c); if(typeof v==='number'&&v>1000) sum+=v; });
+        if(nCol!=null){ const nv=cell(rr,nCol); if(typeof nv==='number'&&nv>0) nSum+=nv; }
         if(castSecs.includes(sec.a)){ const b=cell(rr,0), n=cell(rr,2); if(b&&n) ep.castPlanN++; }
       }
+      if(sec.a==='보조출연자'&&nSum>0) ep.extrasPlanN=nSum;
       if(sum>0) ep.costRef.push({item:label, amt:sum});
     });
     res.ok.cost='비용 참고 '+ep.costRef.length+'건 · 배우 계획 '+ep.castPlanN+'명';
@@ -682,8 +708,10 @@ function importSheet(sn){
   if(ep.times.start) ep.plan.call=ep.times.start;
   ep.actual={gather:'',call:'',end:'',rest:ep.times.rest??1};
   ep.varCrew={};
-  VARCREWS.forEach(c=>ep.varCrew[c]={planN:0,planT:'',n:0,tIn:'',tOut:''});
+  VARCREWS.forEach(c=>ep.varCrew[c]={planN:0,planT:'',n:0,tIn:'',tOut:'',batches:[]});
+  if(ep.extrasPlanN) ep.varCrew['보조출연'].planN=ep.extrasPlanN;
   ep.cast=castFromRaw(ep.callRaw);
+  ep.pgV2=true; ep.breaks=[];
 
   const old=DB.episodes[key];
   if(old){
@@ -721,6 +749,7 @@ function renderEp(){
   document.getElementById('epTag').textContent=DB.settings.title+' · '+CUR;
   if(TAB==='base') renderBase(e);
   else if(TAB==='live') renderLive(e);
+  else if(TAB==='check') renderCheck(e);
   else renderResult(e);
   renderTotals();
 }
@@ -737,21 +766,24 @@ function renderBase(e){
   let sc='';
   e.scenes.forEach((x,i)=>{
     sc+=`<div class="scene">
-      <div class="hd"><span class="sno">S ${esc(x.no)}</span>
+      <div class="hd"><span class="sno">${x.ep?esc(x.ep)+'부 ':''}S ${esc(x.no)}</span>
         <span class="tag">${esc(x.dn)}</span><span class="tag">${esc(x.lso)}</span>
         <span class="loc">${esc(x.loc)}</span></div>
       <div class="desc">${esc(x.cast)}${x.cast&&x.desc?' — ':''}${esc(x.desc)}</div>
       <div class="grid2" style="margin-top:7px;align-items:end">
-        <div><label class="f">페이지(1/8) ★</label><div class="stepper ${x.pages>0?'':'need'}" id="pgS${i}">
-          <button onclick="stpPage(${i},-1)">−</button><span class="val" style="color:var(--ye)" id="pg${i}">${pg8(x.pages)}</span><button onclick="stpPage(${i},1)">＋</button></div></div>
+        <div><label class="f">페이지 (스케줄표 단위, 예 1.3) ★</label>
+          <input type="number" inputmode="decimal" step="0.1" min="0" value="${x.pages||''}" placeholder="0.0"
+            style="${x.pages>0?'':'border-color:var(--rd)'}" onchange="pgSet(${i},this.value)"></div>
         <div><label class="f">씬 성격 ★ ${x.kind?'':'(점선 = 자동 제안 — 탭하여 확정)'}</label>
           <div id="kind${i}" style="display:flex;gap:4px;flex-wrap:wrap">${kindBtns(i,x)}</div></div>
       </div>
     </div>`;
   });
 
-  let nt='<div class="grid2">';
-  NOTES6.forEach(n=>{ nt+=`<div><label class="f">${n}</label><textarea onchange="updQ(e=>e.notes['${esc(n)}']=this.value)">${esc(e.notes[n]||'')}</textarea></div>`; });
+  let nt='<div>';
+  NOTES6.forEach(n=>{ const tv=e.notes[n]||'';
+    const rows=Math.max(2, tv.split('\n').length+1);
+    nt+=`<div style="margin-bottom:8px"><label class="f">${n}</label><textarea rows="${rows}" style="min-height:0;height:auto" onchange="updQ(e=>e.notes['${esc(n)}']=this.value)">${esc(tv)}</textarea></div>`; });
   nt+='</div>';
 
   const cost = e.costRef.length? '<div class="card" style="font-size:12px;line-height:1.9">'+e.costRef.map(c=>`${esc(c.item)} <b style="float:right">${c.amt.toLocaleString()}원</b><br>`).join('')+'<span class="hint">임포트 참고값</span></div>':'';
@@ -775,7 +807,7 @@ function renderBase(e){
     </div>
     ${e.callRaw? '<div class="hint" style="margin-top:7px">콜타임 원문: <span style="color:var(--cy)">'+esc(e.callRaw.replace(/\n/g,' · ').slice(0,90))+'</span></div>':''}</div>
     <h3 class="sec">씬 — 페이지 ★ (${e.scenes.length}씬)</h3>
-    <div class="hint" style="margin-bottom:8px">페이지 = 이 씬의 대본 분량. 1/8 단위 — 대본 1페이지를 8칸으로 나눈 것(반 페이지=4/8, 한 페이지=8/8). 셋업은 현장 탭에서 체크.</div>
+    <div class="hint" style="margin-bottom:8px">페이지 = 스케줄표 단위 소수 입력(반 페이지=0.5). 사전제작일지 씬 표에 「페이지」 열을 추가하면 자동으로 채워집니다. 셋업은 씬 기록 탭에서 자동 집계.</div>
     ${sc}
     <h3 class="sec">팀별 특이사항</h3><div class="card">${nt}</div>
     ${cost? '<h3 class="sec">비용 참고 (임포트)</h3>'+cost : ''}`;
@@ -797,10 +829,9 @@ function setKind(i,c){ const x=DB.episodes[CUR].scenes[i]; x.kind = x.kind===c? 
   const el=document.getElementById('kind'+i); if(el) el.innerHTML=kindBtns(i,x); renderTotals(); }
 
 /* 표적 갱신 스테퍼 — 화면 재생성 없음(스크롤 유지) */
-function stpPage(i,d){ const sc=DB.episodes[CUR].scenes[i]; sc.pages=Math.max(0,(sc.pages||0)+d); save();
-  const el=document.getElementById('pg'+i); if(el) el.textContent=pg8(sc.pages);
-  const st=document.getElementById('pgS'+i); if(st) st.classList.toggle('need',!(sc.pages>0));
-  renderTotals(); }
+function pgSet(i,v){ const sc=DB.episodes[CUR].scenes[i]; sc.pages=Math.max(0,parseFloat(v)||0); save(); renderTotals(); }
+function pgAset(i,v){ const x=DB.episodes[CUR].scenes[i]; x.pagesA=Math.max(0,parseFloat(v)||0); save();
+  const t=document.getElementById('pgT'+i); if(t) t.textContent=pg8(x.pagesA)+'p'; renderTotals(); }
 function stpSetup(i,d){ const sc=DB.episodes[CUR].scenes[i]; sc.setups=Math.max(0,(sc.setups||0)+d); save();
   const el=document.getElementById('su'+i); if(el) el.textContent=sc.setups;
   const st=document.getElementById('suS'+i); if(st) st.classList.toggle('need',!(sc.setups>0));
@@ -820,17 +851,23 @@ function sceneCard(i){
   const st=recStats(x);
   let body='';
   const pEff=x.pagesA??x.pages;
-  const hd=`<div class="hd"><span class="sno">S ${esc(x.no)}</span>
+  const hd=`<div class="hd"><span class="sno">${x.ep?esc(x.ep)+'부 ':''}S ${esc(x.no)}</span>
       <span class="tag">${esc(x.dn)}</span>
       <span class="tag" style="color:var(--ye)" id="pgT${i}">${pg8(pEff)}p</span>
+      ${x.linked?'<span class="tag" style="color:var(--cy);border-color:var(--cy)">🔗연결</span>':''}
       <span class="loc">${esc(x.loc)}</span>
-      ${x.retake?'<span class="pill risk">재촬영</span>':''}</div>
+      ${x.retake?'<span class="pill risk">재촬영</span>':''}
+      <span style="display:flex;gap:3px;flex:0 0 auto">
+        <button class="btn" style="padding:3px 9px;font-size:12px" onclick="scLink(${i})" title="앞 씬과 연결 촬영">🔗</button>
+        <button class="btn" style="padding:3px 9px;font-size:12px" onclick="scMove(${i},-1)">▲</button>
+        <button class="btn" style="padding:3px 9px;font-size:12px" onclick="scMove(${i},1)">▼</button>
+      </span></div>
     <div class="desc">${esc(x.cast)}</div>`;
   /* 페이지 — 기초 설정값이 그대로 연결. 현장 변경분 즉시 반영 */
   const pageRow=`<div class="grid2" style="margin-top:8px;align-items:end">
-    <div><label class="f">페이지(1/8) — 기초 설정 ${pg8(x.pages)}p 연결</label><div class="stepper" style="height:34px">
-      <button onclick="stpPageA(${i},-1)">−</button><span class="val" style="color:var(--ye)" id="pgA${i}">${pg8(pEff)}</span><button onclick="stpPageA(${i},1)">＋</button></div></div>
-    <div class="hint" style="padding-bottom:8px">분량이 바뀌면 여기서 수정 — 결산 즉시 반영</div>
+    <div><label class="f">페이지 — 기초 설정 ${pg8(x.pages)}p 연결 (변경 시 수정)</label>
+      <input type="number" inputmode="decimal" step="0.1" min="0" value="${pEff||''}" placeholder="0.0" onchange="pgAset(${i},this.value)"></div>
+    <div class="hint" style="padding-bottom:8px">결산에 즉시 반영</div>
   </div>`;
 
   if(x.shot==null){
@@ -841,7 +878,9 @@ function sceneCard(i){
   else if(x.shot==='N'){
     body=`<div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <span class="pill dim">미촬영 처리됨</span>
-      <button class="btn" style="margin-left:auto;padding:7px 12px;font-size:12px" onclick="scUnskip(${i})">↩ 되돌리기</button></div>`;
+      <button class="btn" style="margin-left:auto;padding:7px 12px;font-size:12px" onclick="scUnskip(${i})">↩ 되돌리기</button></div>
+    <div style="margin-top:8px"><label class="f">비고 — 미촬영 사유</label>
+      <input type="text" value="${esc(x.note)}" placeholder="사유 입력" onchange="updQ(e=>e.scenes[${i}].note=this.value)"></div>`;
   }
   else {
     /* 기록 이력 라인 — 종류·소요 포함 */
@@ -881,6 +920,10 @@ function sceneCard(i){
             <button class="btn" style="flex:1;padding:8px 0;font-size:12px" onclick="scUndo(${i})">↶ 마지막 테이크 취소</button>
             <button class="btn" style="flex:1;padding:8px 0;font-size:12px" onclick="scEnd(${i})">■ 씬 종료 (OK 없이)</button>
           </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" style="flex:1;padding:8px 0;font-size:12px;color:var(--sub)" onclick="scCancel(${i})">↩ 대기로 되돌리기</button>
+            <button class="btn" style="flex:1;padding:8px 0;font-size:12px;color:var(--sub)" onclick="scToN(${i})">미촬영으로 전환</button>
+          </div>
         </div>`;
       } else {
         body=timeRow+pageRow+`
@@ -891,6 +934,10 @@ function sceneCard(i){
             <button class="btn" style="flex:1;padding:13px 0;border-color:var(--or);color:var(--or)" onclick="scEnd(${i})">■ 씬 종료</button>
           </div>
           <div style="margin-top:6px"><button class="btn" style="width:100%;padding:8px 0;font-size:12px" onclick="scUndo(${i})">↶ 마지막 테이크 취소</button></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" style="flex:1;padding:8px 0;font-size:12px;color:var(--sub)" onclick="scCancel(${i})">↩ 대기로 되돌리기</button>
+            <button class="btn" style="flex:1;padding:8px 0;font-size:12px;color:var(--sub)" onclick="scToN(${i})">미촬영으로 전환</button>
+          </div>
         </div>`;
       }
     } else {
@@ -899,13 +946,15 @@ function sceneCard(i){
       <div style="background:var(--panel2);border-radius:10px;padding:10px 12px;margin-top:8px">
         <div style="font-size:12px;font-weight:800">완료 — 셋업 ${st.setups} · 테이크 ${st.takes??'–'} · OK ${st.ok??'–'} · NG <span style="color:${st.ngSum>0?'var(--rd)':'inherit'}">${st.ngSum}</span></div>
         <div class="grid2" style="margin-top:8px;align-items:end">
-          <div><label class="f">실제 페이지(1/8) — 기본=계획</label><div class="stepper" style="height:34px">
-            <button onclick="stpPageA(${i},-1)">−</button><span class="val" style="color:var(--ye)" id="pgA${i}">${pg8(pA)}</span><button onclick="stpPageA(${i},1)">＋</button></div></div>
+          <div><label class="f">실제 페이지 — 기본=계획</label>
+            <input type="number" inputmode="decimal" step="0.1" min="0" value="${pA||''}" placeholder="0.0" onchange="pgAset(${i},this.value)"></div>
           <div style="display:flex;gap:8px">
             <button class="btn" style="flex:1;padding:9px 0;font-size:12px;${x.retake?'border-color:var(--rd);color:var(--rd)':''}" onclick="scRetake(${i})">${x.retake?'재촬영 표시됨 ✓':'재촬영 표시'}</button>
             <button class="btn" style="flex:1;padding:9px 0;font-size:12px" onclick="scReopen(${i})">✎ 기록 재개</button>
           </div>
         </div>
+        <div style="margin-top:8px"><label class="f">비고 — 예: 플래시백은 기존 촬영분 활용</label>
+          <input type="text" value="${esc(x.note)}" placeholder="특이사항 입력" onchange="updQ(e=>e.scenes[${i}].note=this.value)"></div>
       </div>`;
     }
     if(hist) body+=`<div class="ngchips" style="margin-top:7px">${hist}</div>`;
@@ -943,22 +992,45 @@ function scEnd(i){ const x=DB.episodes[CUR].scenes[i];
   if(last&&!last.t1&&last.takes.length) last.t1=nowHM();
   x.done=true; if(!x.tEnd) x.tEnd=nowHM();
   x.setups=recStats(x).setups;
+  /* 배우 아웃 자동: 이 씬 배우 중 남은 씬에 더 이상 등장하지 않는 배우 */
+  const _e=DB.episodes[CUR];
+  const _rem=_e.scenes.filter(y=>y!==x&&y.shot!=='N'&&!y.done);
+  (_e.cast||[]).forEach(c=>{
+    if(!c.tOut&&x.cast&&x.cast.includes(c.name)&&!_rem.some(y=>y.cast&&y.cast.includes(c.name))) c.tOut=nowHM();
+  });
   save(); paintScene(i); }
 function scReopen(i){ const x=DB.episodes[CUR].scenes[i]; x.done=false;
   if(!x.rec) x.rec={setups:[newSetup()]}; save(); paintScene(i); }
+function scCancel(i){ const x=DB.episodes[CUR].scenes[i];
+  const has=x.rec&&x.rec.setups.some(su=>su.takes.length);
+  if(has&&!confirm('기록된 테이크가 삭제됩니다. 대기 상태로 되돌릴까요?')) return;
+  x.shot=null; x.rec=null; x.done=false; x.tStart=''; x.tEnd=''; save(); paintScene(i); }
+function scToN(i){ const x=DB.episodes[CUR].scenes[i];
+  const has=x.rec&&x.rec.setups.some(su=>su.takes.length);
+  if(has&&!confirm('기록된 테이크가 삭제됩니다. 미촬영으로 전환할까요?')) return;
+  x.shot='N'; x.rec=null; x.done=false; x.tStart=''; x.tEnd=''; save(); paintScene(i); }
+function scLink(i){ const x=DB.episodes[CUR].scenes[i]; x.linked=!x.linked; save(); paintScene(i); }
+function scMove(i,d){ const sc=DB.episodes[CUR].scenes; const j=i+d;
+  if(j<0||j>=sc.length) return;
+  [sc[i],sc[j]]=[sc[j],sc[i]]; save();
+  const v=document.getElementById('ep'); const st=v.scrollTop; renderEp(); v.scrollTop=st; }
 function scRetake(i){ const x=DB.episodes[CUR].scenes[i]; x.retake=!x.retake; save(); paintScene(i); }
-function stpPageA(i,d){ const x=DB.episodes[CUR].scenes[i];
-  x.pagesA=Math.max(0,(x.pagesA??x.pages)+d); save();
-  const el=document.getElementById('pgA'+i); if(el) el.textContent=pg8(x.pagesA);
-  const t=document.getElementById('pgT'+i); if(t) t.textContent=pg8(x.pagesA)+'p';
-  renderTotals(); }
+/* (v0.7: stpPageA → pgAset) */
 
 function renderLive(e){
-  const H=(k,l,v,type='time')=>`<div><label class="f">${l}</label><input type="${type}" value="${esc(v)}" onchange="updQ(e=>{${k}=this.value})"></div>`;
   let sc='';
   e.scenes.forEach((x,i)=>{ sc+=`<div id="scw${i}">${sceneCard(i)}</div>`; });
+  document.getElementById('epBody').innerHTML=`
+    <h3 class="sec">씬 기록 (${e.scenes.length}씬)</h3>
+    <div class="hint" style="margin-bottom:8px">▶ 촬영 시작(시각 자동) → 테이크마다 NG(유형)/OK → [다음 셋업]/[씬 종료]. ▲▼로 촬영 순서 변경(결산·export에 반영). 콜·인원·비용·휴게는 [체크] 탭.</div>
+    ${sc}`;
+}
 
-  /* 배우 — 사전제작일지 명시 배우별 콜 체크 */
+/* ===== 체크 탭 — 실제 시간·배우 콜·인원·휴게·비용 ===== */
+function renderCheck(e){
+  const H=(k,l,v,type='time')=>`<div><label class="f">${l}</label><input type="${type}" value="${esc(v)}" onchange="updQ(e=>{${k}=this.value})"></div>`;
+
+  /* 배우 — 배우별 콜 체크 */
   let ca='<div class="card">';
   ca+=`<div style="display:grid;grid-template-columns:64px 1fr 1fr 1fr;gap:6px;margin-bottom:4px">
     <label class="f" style="margin:0">배우</label><label class="f" style="margin:0">계획 콜</label>
@@ -974,27 +1046,62 @@ function renderLive(e){
   if(!e.cast.length) ca+='<div class="hint">임포트한 콜타임 원문에서 배우를 찾지 못했습니다. 아래로 추가하세요.</div>';
   ca+=`<div style="display:flex;gap:6px;margin-top:8px">
     <input type="text" id="newCast" placeholder="배우명" style="flex:1">
-    <button class="btn" style="flex:0 0 auto" onclick="addCast()">＋ 추가</button></div></div>`;
+    <button class="btn" style="flex:0 0 auto" onclick="addCast()">＋ 추가</button></div>
+  <div class="hint" style="margin-top:6px">아웃 시간은 그 배우의 마지막 씬 종료 시 자동 기입(수정 가능).</div></div>`;
 
-  /* 무술·보조출연 — 그룹(인원+시간) */
-  let vc='';
-  VARCREWS.forEach(c=>{
-    const v=e.varCrew[c];
-    vc+=`<div class="card">
-      <div style="font-size:13px;font-weight:800;margin-bottom:7px">${c}</div>
-      <div class="grid2" style="margin-bottom:8px">
-        <div><label class="f">계획 인원</label><input type="number" inputmode="numeric" min="0" value="${v.planN||''}" placeholder="0"
-          onchange="updQ(e=>e.varCrew['${c}'].planN=Math.max(0,parseInt(this.value)||0))"></div>
-        <div><label class="f">계획 콜</label><input type="time" value="${v.planT}" onchange="updQ(e=>e.varCrew['${c}'].planT=this.value)"></div>
-      </div>
-      <div class="grid3">
-        <div><label class="f">실제 인원</label><input type="number" inputmode="numeric" min="0" value="${v.n||''}" placeholder="0"
-          onchange="updQ(e=>e.varCrew['${c}'].n=Math.max(0,parseInt(this.value)||0))"></div>
-        <div><label class="f">실제 진입</label><input type="time" value="${v.tIn}" onchange="updQ(e=>e.varCrew['${c}'].tIn=this.value)"></div>
-        <div><label class="f">실제 종료</label><input type="time" value="${v.tOut}" onchange="updQ(e=>e.varCrew['${c}'].tOut=this.value)"></div>
-      </div>
+  /* 무술 — 그룹 */
+  const mv=e.varCrew['무술'];
+  const vc=`<div class="card">
+    <div style="font-size:13px;font-weight:800;margin-bottom:7px">무술</div>
+    <div class="grid2" style="margin-bottom:8px">
+      <div><label class="f">계획 인원</label><input type="number" inputmode="numeric" min="0" value="${mv.planN||''}" placeholder="0"
+        onchange="updQ(e=>e.varCrew['무술'].planN=Math.max(0,parseInt(this.value)||0))"></div>
+      <div><label class="f">계획 콜</label><input type="time" value="${mv.planT}" onchange="updQ(e=>e.varCrew['무술'].planT=this.value)"></div>
+    </div>
+    <div class="grid3">
+      <div><label class="f">실제 인원</label><input type="number" inputmode="numeric" min="0" value="${mv.n||''}" placeholder="0"
+        onchange="updQ(e=>e.varCrew['무술'].n=Math.max(0,parseInt(this.value)||0))"></div>
+      <div><label class="f">실제 진입</label><input type="time" value="${mv.tIn}" onchange="updQ(e=>e.varCrew['무술'].tIn=this.value)"></div>
+      <div><label class="f">실제 종료</label><input type="time" value="${mv.tOut}" onchange="updQ(e=>e.varCrew['무술'].tOut=this.value)"></div>
+    </div></div>`;
+
+  /* 보조출연 — 차수별 */
+  const bv=e.varCrew['보조출연']; bv.batches=bv.batches||[];
+  let ex=`<div class="card">
+    <div style="font-size:13px;font-weight:800;margin-bottom:7px">보조출연 — 차수별 기록</div>
+    <div class="grid2" style="margin-bottom:8px">
+      <div><label class="f">계획 인원 (일지 임포트)</label><input type="number" inputmode="numeric" min="0" value="${bv.planN||''}" placeholder="0"
+        onchange="updQ(e=>e.varCrew['보조출연'].planN=Math.max(0,parseInt(this.value)||0))"></div>
+      <div><label class="f">계획 콜</label><input type="time" value="${bv.planT}" onchange="updQ(e=>e.varCrew['보조출연'].planT=this.value)"></div>
+    </div>`;
+  bv.batches.forEach((b,bi)=>{
+    ex+=`<div style="display:grid;grid-template-columns:44px 1fr 1fr 1fr 40px;gap:6px;margin-bottom:6px;align-items:end">
+      <b style="font-size:12.5px;padding-bottom:9px">${bi+1}차</b>
+      <div><label class="f">인원</label><input type="number" inputmode="numeric" min="0" value="${b.n||''}" placeholder="0"
+        onchange="updQ(e=>e.varCrew['보조출연'].batches[${bi}].n=Math.max(0,parseInt(this.value)||0))"></div>
+      <div><label class="f">진입</label><input type="time" value="${b.tIn}" onchange="updQ(e=>e.varCrew['보조출연'].batches[${bi}].tIn=this.value)"></div>
+      <div><label class="f">종료</label><input type="time" value="${b.tOut}" onchange="updQ(e=>e.varCrew['보조출연'].batches[${bi}].tOut=this.value)"></div>
+      <button class="btn" style="padding:8px 0;font-size:14px" onclick="delBatch(${bi})">✕</button>
     </div>`;
   });
+  const exTot=bv.batches.reduce((a,b)=>a+(b.n||0),0);
+  ex+=`<button class="btn block" style="margin-top:4px" onclick="addBatch()">＋ 차수 추가</button>
+    <div class="hint" style="margin-top:6px">실제 합계: <b style="color:var(--ink)">${exTot}명</b> / 계획 ${bv.planN||0}명 — 몇 차로 나눠 부르고 보내든 차수별로 기록.</div></div>`;
+
+  /* 휴게·중단 기록 */
+  e.breaks=e.breaks||[];
+  let br='<div class="card">';
+  e.breaks.forEach((b,bi)=>{
+    br+=`<div style="display:grid;grid-template-columns:1fr 1fr 2fr 40px;gap:6px;margin-bottom:6px;align-items:end">
+      <div><label class="f">시작</label><input type="time" value="${b.t0}" onchange="updQ(e=>e.breaks[${bi}].t0=this.value)"></div>
+      <div><label class="f">종료</label><input type="time" value="${b.t1}" onchange="updQ(e=>e.breaks[${bi}].t1=this.value)"></div>
+      <div><label class="f">내용</label><input type="text" value="${esc(b.memo)}" placeholder="중식 / 셋업 대기 등" onchange="updQ(e=>e.breaks[${bi}].memo=this.value)"></div>
+      <button class="btn" style="padding:8px 0;font-size:14px" onclick="delBreak(${bi})">✕</button>
+    </div>`;
+  });
+  const brH=e.breaks.reduce((a,b)=>{const d=hdiff(b.t0,b.t1);return a+(d||0);},0);
+  br+=`<button class="btn block" style="margin-top:4px" onclick="addBreak()">＋ 휴게 추가</button>
+    <div class="hint" style="margin-top:6px">합계: <b style="color:var(--ink)">${brH?brH.toFixed(1):'0'}h</b> — 식사·촬영 중간 휴게를 시간과 함께 기록. 결산·export에 포함.</div></div>`;
 
   document.getElementById('epBody').innerHTML=`
     <h3 class="sec">실제 시간</h3><div class="card"><div class="grid4">
@@ -1005,18 +1112,19 @@ function renderLive(e){
         <button onclick="stpRestA(-1)">−</button><span class="val" id="restAV">${e.actual.rest??1}</span><button onclick="stpRestA(1)">＋</button></div></div>
     </div>
     <div class="hint" style="margin-top:6px">계획: 집결 ${e.plan.gather||'–'} · 콜 ${e.plan.call||'–'} · 종료 ${e.plan.end||'–'}</div></div>
-
-    <h3 class="sec">씬 기록 (${e.scenes.length}씬) — 순서대로 누르면 됩니다</h3>
-    <div class="hint" style="margin-bottom:8px">▶ 촬영 시작(시각 자동) → 테이크마다 NG(유형 선택) 또는 OK → OK 후 [다음 셋업] 또는 [씬 종료] → 종료 시 재촬영·실제 페이지 확정. 셋업·테이크·NG는 자동 집계됩니다.</div>
-    ${sc}
-
     <h3 class="sec">배우 콜 체크 — 계획 콜 대비 실제 진입·종료</h3>
     ${ca}
     <h3 class="sec">무술 · 보조출연 — 인원·시간 체크</h3>
-    ${vc}
+    ${vc}${ex}
+    <h3 class="sec">휴게·중단 기록</h3>
+    ${br}
     <h3 class="sec">당일 비용 확정 — 촬영 종료 후 1회 (BUR 산출)</h3>
     ${costCard(e)}`;
 }
+function addBatch(){ DB.episodes[CUR].varCrew['보조출연'].batches.push({n:0,tIn:'',tOut:''}); save(); renderEp(); }
+function delBatch(bi){ DB.episodes[CUR].varCrew['보조출연'].batches.splice(bi,1); save(); renderEp(); }
+function addBreak(){ DB.episodes[CUR].breaks.push({t0:nowHM(),t1:'',memo:''}); save(); renderEp(); }
+function delBreak(bi){ DB.episodes[CUR].breaks.splice(bi,1); save(); renderEp(); }
 function costCard(e){
   const p=costPrefill(e);
   let h='<div class="card"><div class="grid3">';
@@ -1045,8 +1153,8 @@ function metricsOf(e){
   const shot=e.scenes.filter(x=>x.shot==='Y');
   const m={};
   m.scenesY=shot.length; m.scenesN=e.scenes.filter(x=>x.shot==='N').length;
-  m.pgPlan=e.scenes.reduce((a,x)=>a+(x.pages||0),0)/8;
-  m.pgShot=shot.reduce((a,x)=>a+((x.pagesA??x.pages)||0),0)/8; /* 실제 페이지 우선 */
+  m.pgPlan=e.scenes.reduce((a,x)=>a+(x.pages||0),0);
+  m.pgShot=shot.reduce((a,x)=>a+((x.pagesA??x.pages)||0),0); /* 실제 페이지 우선 */
   /* 테크트리 기록 집계 */
   m.su=0; m.takes=0; m.ok=0; m.ftcN=0; m.recSetups=0; m.ngAll={}; m.ngSum=0;
   let anyRec=false;
@@ -1082,7 +1190,7 @@ function metricsOf(e){
   /* R1b — 씬 성격: 대본 프로파일(SDI)·유형별 효율 */
   m.byKind={}; let sdiNum=0, sdiDen=0;
   e.scenes.forEach(x=>{
-    const pEff=((x.pagesA??x.pages)||0)/8;
+    const pEff=(x.pagesA??x.pages)||0;
     if(x.kind&&pEff>0){ sdiNum+=pEff*sceneW(x); sdiDen+=pEff; }
     if(x.shot!=='Y') return;
     const k=x.kind||'미분류';
@@ -1120,6 +1228,8 @@ function metricsOf(e){
     m.otr=over/regPlan;
   }
   m.callDelay=(e.plan.call&&e.actual.call)? toMin(e.actual.call)-toMin(e.plan.call) : null; /* 분. −=조기 */
+  m.breaksN=(e.breaks||[]).length;
+  m.breaksH=(e.breaks||[]).reduce((a,b)=>{const d=hdiff(b.t0,b.t1);return a+(d||0);},0);
   m.onTime = m.callDelay==null? null : m.callDelay<=0;
   m.wrpOk = (e.plan.end&&e.actual.end)? Math.abs(toMin(e.actual.end)-toMin(e.plan.end))<=30 : null;
   return m;
@@ -1242,9 +1352,12 @@ function renderResult(e){
       return `<div class="rrow"><span>${esc(c.name)}</span><b>콜 ${c.planT||'–'} → ${c.tIn||'–'} ~ ${c.tOut||'–'} ${badge}</b></div>`;
     }).join('')||'<div class="hint">배우 기록 없음</div>';
     const vcRows=VARCREWS.map(c=>{ const v=e.varCrew[c];
-      if(!v.planN&&!v.n) return '';
-      const diff=v.n-v.planN;
-      return `<div class="rrow"><span>${c}</span><b>계획 ${v.planN}명 ${v.planT||''} → 실제 ${v.n}명 ${v.tIn||'–'}~${v.tOut||'–'} ${diff?`<span style="color:${diff<0?'var(--rd)':'var(--gn)'}">(${diff>0?'+':''}${diff})</span>`:''}</b></div>`;
+      const bat=(c==='보조출연'&&v.batches&&v.batches.length)? v.batches : null;
+      const nReal=bat? bat.reduce((a,b)=>a+(b.n||0),0) : v.n;
+      if(!v.planN&&!nReal) return '';
+      const diff=nReal-v.planN;
+      const tSpan=bat? (bat[0].tIn||'–')+'~'+(bat[bat.length-1].tOut||'–')+' ('+bat.length+'차)' : (v.tIn||'–')+'~'+(v.tOut||'–');
+      return `<div class="rrow"><span>${c}</span><b>계획 ${v.planN}명 ${v.planT||''} → 실제 ${nReal}명 ${tSpan} ${diff?`<span style="color:${diff<0?'var(--rd)':'var(--gn)'}">(${diff>0?'+':''}${diff})</span>`:''}</b></div>`;
     }).join('');
     document.getElementById('epBody').innerHTML=`
       <h3 class="sec">당일 결산 — ${esc(e.date||CUR)}</h3>${toggle}
@@ -1261,6 +1374,7 @@ function renderResult(e){
         ${mcell('CTA · 콜 지연', m.callDelay==null?'–':(m.callDelay<=0?'정시':'+'+m.callDelay), m.callDelay>0?'분':'', 'var(--gn)', ZONES.cta(m.callDelay))}
         ${mcell('촬영시간 합', fmtN(m.shootH), 'h', 'var(--ye)', null)}
         ${mcell('콜투랩', fmtN(m.c2w), 'h', 'var(--bl)', null)}
+        ${mcell('휴게 기록', m.breaksN? fmtN(m.breaksH):'–', m.breaksN? 'h · '+m.breaksN+'건':'', 'var(--cy)', null)}
       </div>
       <h3 class="sec">품질 — 테이크 기반 (씬 기록 자동 집계)</h3>
       <div class="fgrid">
@@ -1484,9 +1598,9 @@ function renderResult(e){
 /* ---------- 합계 바 ---------- */
 function renderTotals(){
   const e=DB.episodes[CUR]; if(!e) return;
-  const pgPlan=e.scenes.reduce((a,x)=>a+(x.pages||0),0)/8;
+  const pgPlan=e.scenes.reduce((a,x)=>a+(x.pages||0),0);
   const shot=e.scenes.filter(x=>x.shot==='Y');
-  const pgShot=shot.reduce((a,x)=>a+(x.pages||0),0)/8;
+  const pgShot=shot.reduce((a,x)=>a+((x.pagesA??x.pages)||0),0);
   const ngSum=e.scenes.reduce((a,x)=>a+ngTotal(x),0);
   const suSum=(shot.length?shot:e.scenes).reduce((a,x)=>a+(x.setups||0),0);
   document.getElementById('totbar').innerHTML=`
@@ -1524,9 +1638,9 @@ function exportXlsx(){
     B30:'회당 정규 촬영시간 (시간)',E30:s.stdHours,B31:'회당 BTL 표준 (원)',E31:s.stdBTL};
   XLSX.utils.book_append_sheet(wb, mk(info), '0_작품정보');
 
-  const pgPlan=e.scenes.reduce((a,x)=>a+(x.pages||0),0)/8;
+  const pgPlan=e.scenes.reduce((a,x)=>a+(x.pages||0),0);
   const shot=e.scenes.filter(x=>x.shot==='Y');
-  const pgShot=shot.reduce((a,x)=>a+(x.pages||0),0)/8;
+  const pgShot=shot.reduce((a,x)=>a+((x.pagesA??x.pages)||0),0);
   const d={A1:s.title+' 제작일지 — 앱 v0.2',A4:'■ 헤더',
     A5:'작품명',B5:s.title,E5:'회차',F5:CUR,G5:'촬영일',H5:e.date||'',J5:'작성자',K5:e.header.writer||s.writer||'',
     A6:'일출/일몰',B6:e.header.sun||'',E6:'기온/날씨',F6:e.header.weather||'',H6:'바람',I6:e.header.wind||'',
@@ -1535,12 +1649,12 @@ function exportXlsx(){
     A10:'[실제] 집결',B10:e.actual.gather||'',C10:'콜시작',D10:e.actual.call||'',F10:'종료',G10:e.actual.end||'',H10:'휴게(h)',I10:e.actual.rest??'',
     A12:'■ 씬 기록',
     A13:'회',B13:'#S',C13:'D/N',D13:'L/S/O',E13:'장소',F13:'인물 / 내용',G13:'계획 페이지',H13:'실제 페이지',
-    I13:'촬영여부',J13:'시작',K13:'종료',L13:'셋업',M13:'테이크',N13:'OK',O13:'NG',P13:'재촬영',Q13:'셋업별 기록',R13:'씬 성격'};
+    I13:'촬영여부',J13:'시작',K13:'종료',L13:'셋업',M13:'테이크',N13:'OK',O13:'NG',P13:'재촬영',Q13:'셋업별 기록',R13:'씬 성격',S13:'연결',T13:'비고'};
   e.scenes.forEach((x,i)=>{
     const r=14+i, st=recStats(x);
     d['A'+r]=x.ep; d['B'+r]=x.no; d['C'+r]=x.dn; d['D'+r]=x.lso; d['E'+r]=x.loc;
-    d['F'+r]=(x.cast?x.cast+' / ':'')+x.desc; d['G'+r]=x.pages?+(x.pages/8).toFixed(3):'';
-    d['H'+r]= x.pagesA!=null? +(x.pagesA/8).toFixed(3):'';
+    d['F'+r]=(x.cast?x.cast+' / ':'')+x.desc; d['G'+r]=x.pages?+(+x.pages).toFixed(2):'';
+    d['H'+r]= x.pagesA!=null? +(+x.pagesA).toFixed(2):'';
     d['I'+r]= x.shot==='Y'?'촬영': x.shot==='N'?'미촬영':'';
     d['J'+r]=x.tStart; d['K'+r]=x.tEnd; d['L'+r]=st.setups||'';
     d['M'+r]=st.takes??''; d['N'+r]=st.ok??''; d['O'+r]=st.ngSum||'';
@@ -1550,6 +1664,7 @@ function exportXlsx(){
       return 'S'+(si+1)+(tag?'['+tag+']':'')+':'+(su.takes||[]).map(t=>t==='OK'?'O':'N('+t+')').join('·');
     }).join(' / '):'';
     d['R'+r]=x.kind? (KINDN[x.kind]||x.kind):'';
+    d['S'+r]=x.linked?'연결':''; d['T'+r]=x.note||'';
   });
   let r=14+e.scenes.length+1;
   const M=metricsOf(e);
@@ -1585,9 +1700,22 @@ function exportXlsx(){
   r+=2+Math.max((e.cast||[]).length,1)+1;
   d['A'+r]='■ 무술·보조출연 — 인원·시간';
   d['A'+(r+1)]='구분'; d['B'+(r+1)]='계획 인원'; d['C'+(r+1)]='계획 콜'; d['D'+(r+1)]='실제 인원'; d['E'+(r+1)]='실제 진입'; d['F'+(r+1)]='실제 종료';
-  VARCREWS.forEach((c,i)=>{ const v=e.varCrew[c], rr=r+2+i;
-    d['A'+rr]=c; d['B'+rr]=v.planN; d['C'+rr]=v.planT; d['D'+rr]=v.n; d['E'+rr]=v.tIn; d['F'+rr]=v.tOut; });
-  r+=5;
+  let rr=r+2;
+  VARCREWS.forEach(c=>{ const v=e.varCrew[c];
+    const bat=(c==='보조출연'&&v.batches&&v.batches.length)? v.batches:null;
+    const nReal=bat? bat.reduce((a,b)=>a+(b.n||0),0) : v.n;
+    d['A'+rr]=c; d['B'+rr]=v.planN; d['C'+rr]=v.planT; d['D'+rr]=nReal;
+    d['E'+rr]=bat? (bat[0].tIn||'') : v.tIn; d['F'+rr]=bat? (bat[bat.length-1].tOut||'') : v.tOut; rr++;
+    if(bat) bat.forEach((b,bi)=>{ d['A'+rr]='  보조출연 '+(bi+1)+'차'; d['D'+rr]=b.n; d['E'+rr]=b.tIn; d['F'+rr]=b.tOut; rr++; });
+  });
+  rr++;
+  if((e.breaks||[]).length){
+    d['A'+rr]='■ 휴게·중단 기록'; rr++;
+    d['A'+rr]='시작'; d['B'+rr]='종료'; d['C'+rr]='내용'; rr++;
+    e.breaks.forEach(b=>{ d['A'+rr]=b.t0; d['B'+rr]=b.t1; d['C'+rr]=b.memo||''; rr++; });
+    rr++;
+  }
+  r=rr;
   d['A'+r]='■ 팀별 특이사항';
   NOTES6.forEach((n,i)=>{ d['A'+(r+1+i)]=n; d['C'+(r+1+i)]=e.notes[n]||''; });
   XLSX.utils.book_append_sheet(wb, mk(d), '양식_'+CUR);
