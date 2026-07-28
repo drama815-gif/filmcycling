@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0C1016">
-<title>FilmCycling Computer v0.9.1</title>
+<title>FilmCycling Computer v0.9.2</title>
 <style>
   :root{
     --bg:#0C1016; --panel:#151B24; --panel2:#1A222D; --line:#232B37; --ink:#F2F5F8; --sub:#7C8794;
@@ -179,7 +179,7 @@
   <div id="entryTiles"></div>
   <div style="position:absolute;top:6%;width:100%;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35);z-index:2">
     <div style="font-size:clamp(24px,4.5vw,40px);font-weight:900">FilmCycling Computer</div>
-    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.9.1 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
+    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.9.2 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
   </div>
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;z-index:1">
     <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" style="width:min(980px,100%);display:block">
@@ -233,7 +233,8 @@
     <div class="body">
       <h3 class="sec">작품 요약</h3>
       <div class="fgrid" id="homeSummary"></div>
-      <h3 class="sec">회차</h3>
+      <h3 class="sec" style="display:flex;align-items:center">회차
+        <button class="btn" id="epMgmtBtn" style="margin-left:auto;padding:6px 14px;font-size:12px" onclick="epMgmt()">관리</button></h3>
       <div id="epList"></div>
       <button class="btn primary block" onclick="startImport()">＋ 회차 임포트 (.xlsx)</button>
       <input type="file" id="fileIn" accept=".xlsx,.XLSX,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="onFile(this)">
@@ -301,7 +302,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </script>
 <script>
 /* ============================================================
-   FilmCycling Computer 앱 v0.9.1 — 종합지수·배우 자동 기록·원터치 입력·위치 유형(LT)·이동 전환(MTT·MLR)
+   FilmCycling Computer 앱 v0.9.2 — 종합지수·자동 기록·원터치·위치 유형·이동 전환 · 회차 관리(이름 변경·삭제)
    ============================================================ */
 const LS_KEY='fcc_app_v01'; /* v0.1 데이터와 호환 유지 */
 
@@ -499,7 +500,31 @@ function epStatus(e){
   if(baseDone) return ['기초 완료','info'];
   return ['기초 입력 필요','dim'];
 }
+/* v0.9.2 — 회차 관리 (이름 변경·삭제) */
+let EPMGMT=false;
+function epMgmt(){ EPMGMT=!EPMGMT; renderHome(); }
+function renEp(k,ev){ ev.stopPropagation();
+  const nk=(prompt('새 회차 이름 (예: A-42)', k)||'').trim();
+  if(!nk||nk===k) return;
+  if(DB.episodes[nk]){ alert('이미 존재하는 회차 이름입니다: '+nk); return; }
+  DB.episodes[nk]=DB.episodes[k]; delete DB.episodes[k];
+  if(CUR===k) CUR=nk;
+  save(); renderHome();
+}
+function delEp(k,ev){ ev.stopPropagation();
+  const e=DB.episodes[k];
+  const has=e&&e.scenes&&e.scenes.some(x=>x.shot==='Y'||x.rec);
+  if(!confirm('회차 '+k+'를 삭제할까요?'+(has?'\n\n※ 현장 기록이 있는 회차입니다. 삭제 전 Excel export 백업을 권장합니다.':''))) return;
+  if(!confirm('삭제하면 이 기기에서 복구할 수 없습니다.\n(백업해 둔 Excel의 _FCC_DATA 시트로만 복원 가능)\n\n정말 삭제할까요?')) return;
+  delete DB.episodes[k];
+  if(CUR===k) CUR=null;
+  save(); renderHome();
+}
 function renderHome(){
+  const mb=document.getElementById('epMgmtBtn');
+  if(mb){ mb.textContent=EPMGMT?'완료':'관리';
+    mb.style.borderColor=EPMGMT?'var(--gn)':'var(--line)';
+    mb.style.color=EPMGMT?'var(--gn)':'var(--ink)'; }
   const s=DB.settings, eps=Object.keys(DB.episodes).sort();
   document.getElementById('homeWork').textContent=s.title;
   document.getElementById('homeDate').textContent=new Date().toISOString().slice(0,10);
@@ -519,10 +544,13 @@ function renderHome(){
     const e=migrate(DB.episodes[k]);
     const pg=e.scenes.reduce((a,sc)=>a+(sc.pages||0),0);
     const [st,cl]=epStatus(e);
-    el.innerHTML+=`<div class="epcard" onclick="openEp('${k}')">
+    el.innerHTML+=`<div class="epcard"${EPMGMT?'':` onclick="openEp('${k}')"`} style="${EPMGMT?'cursor:default':''}">
       <span class="no">${k}</span>
       <span class="info">${esc(e.date||'날짜 미정')} · ${e.scenes.length}씬 · ${pg.toFixed(1)}p</span>
-      <span class="st pill ${cl}">${st}</span></div>`;
+      ${EPMGMT? `<span style="margin-left:auto;display:flex;gap:6px;flex:0 0 auto">
+        <button class="btn" style="padding:9px 13px;font-size:12.5px" onclick="renEp('${k}',event)">이름 변경</button>
+        <button class="btn" style="padding:9px 13px;font-size:12.5px;border-color:var(--rd);color:var(--rd)" onclick="delEp('${k}',event)">삭제</button></span>`
+      : `<span class="st pill ${cl}">${st}</span>`}</div>`;
   });
 }
 
