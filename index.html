@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0C1016">
-<title>FilmCycling Computer v0.8</title>
+<title>FilmCycling Computer v0.9</title>
 <style>
   :root{
     --bg:#0C1016; --panel:#151B24; --panel2:#1A222D; --line:#232B37; --ink:#F2F5F8; --sub:#7C8794;
@@ -179,7 +179,7 @@
   <div id="entryTiles"></div>
   <div style="position:absolute;top:6%;width:100%;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35);z-index:2">
     <div style="font-size:clamp(24px,4.5vw,40px);font-weight:900">FilmCycling Computer</div>
-    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.8 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
+    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.9 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
   </div>
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;z-index:1">
     <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" style="width:min(980px,100%);display:block">
@@ -301,7 +301,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </script>
 <script>
 /* ============================================================
-   FilmCycling Computer 앱 v0.8 — 기초·현장·결산 · 지표 상세 시트
+   FilmCycling Computer 앱 v0.9 — 종합지수(PEI·RPS·TG)·배우 자동 기록·원터치 입력
    ============================================================ */
 const LS_KEY='fcc_app_v01'; /* v0.1 데이터와 호환 유지 */
 
@@ -835,12 +835,20 @@ function renderBase(e){
     </div>
     ${e.callRaw? '<div class="hint" style="margin-top:7px">콜타임 원문: <span style="color:var(--cy)">'+esc(e.callRaw.replace(/\n/g,' · ').slice(0,90))+'</span></div>':''}</div>
     <h3 class="sec">씬 — 페이지 ★ (${e.scenes.length}씬)</h3>
+    <button class="btn block" style="margin:8px 0 4px" onclick="kindAll()">씬 성격 자동 제안 일괄 적용 — 미분류 씬만 (SDI 보정에 필요)</button>
     <div class="hint" style="margin-bottom:8px">페이지 = 스케줄표 단위 소수 입력(반 페이지=0.5). 사전제작일지 씬 표에 「페이지」 열을 추가하면 자동으로 채워집니다. 셋업은 씬 기록 탭에서 자동 집계.</div>
     ${sc}
     <h3 class="sec">팀별 특이사항</h3><div class="card">${nt}</div>
     ${cost? '<h3 class="sec">비용 참고 (임포트)</h3>'+cost : ''}`;
 }
 
+/* v0.9 — 미분류 씬 성격 일괄 적용 (자동 제안 기반) */
+function kindAll(){
+  const e=DB.episodes[CUR]; let n=0;
+  e.scenes.forEach(sc=>{ if(!sc.kind){ sc.kind=suggestKind(sc); n++; } });
+  save(); renderEp();
+  alert(n? n+'개 씬에 자동 제안 성격을 적용했습니다. 씬별 버튼으로 수정 가능합니다.':'미분류 씬이 없습니다.');
+}
 /* 씬 성격 버튼 (자동 제안 = 점선 강조) */
 function kindBtns(i,x){
   const sug = x.kind? null : suggestKind(x);
@@ -940,9 +948,10 @@ function sceneCard(i){
             · 테이크 <span style="color:var(--ye)">${cur.length+1}</span></div>
           ${typeSel}
           <div style="display:flex;gap:8px">
-            <button class="btn" style="flex:1;padding:15px 0;background:var(--gn);color:#0C1016;border:none;font-size:16px" onclick="scTake(${i},'OK')">OK ✓</button>
-            <button class="btn" style="flex:1;padding:15px 0;background:var(--rd);color:#fff;border:none;font-size:16px" onclick="scTake(${i},document.getElementById('ngc${i}').value)">NG ✕</button>
-            <select id="ngc${i}" style="flex:1;height:auto">${NGC.map(([c,n])=>`<option value="${c}">${c} ${n}</option>`).join('')}</select>
+            <button class="btn" style="flex:1;padding:15px 0;background:var(--gn);color:#0C1016;border:none;font-size:17px" onclick="scTake(${i},'OK')">OK ✓</button>
+          </div>
+          <div style="display:flex;gap:5px;margin-top:8px">
+            ${NGC.map(([c,n])=>`<button class="btn" style="flex:1;padding:12px 0;font-size:12.5px;font-weight:800;background:${NGCOLOR[c]};color:${c==='03'?'#0C1016':'#fff'};border:none" onclick="scTake(${i},'${c}')">NG ${n}</button>`).join('')}
           </div>
           <div style="display:flex;gap:8px;margin-top:8px">
             <button class="btn" style="flex:1;padding:8px 0;font-size:12px" onclick="scUndo(${i})">↶ 마지막 테이크 취소</button>
@@ -993,7 +1002,10 @@ function paintScene(i){ const w=document.getElementById('scw'+i); if(w) w.innerH
 const newSetup=()=>({type:'',t0:nowHM(),t1:'',takes:[]});
 function scStart(i){ const x=DB.episodes[CUR].scenes[i]; x.shot='Y'; x.done=false;
   if(!x.rec) x.rec={setups:[newSetup()]}; if(!x.rec.setups.length) x.rec.setups.push(newSetup());
-  if(!x.tStart) x.tStart=nowHM(); save(); paintScene(i); }
+  if(!x.tStart) x.tStart=nowHM();
+  /* v0.9 — 배우 진입 자동: 이 씬 출연 배우의 진입 시각이 비어 있으면 씬 시작 시각 스탬프 */
+  (DB.episodes[CUR].cast||[]).forEach(c=>{ if(!c.tIn&&x.cast&&x.cast.includes(c.name)){ c.tIn=x.tStart; c.tInAuto=true; } });
+  save(); paintScene(i); }
 function scSkip(i){ const x=DB.episodes[CUR].scenes[i]; x.shot='N'; save(); paintScene(i); }
 function scUnskip(i){ const x=DB.episodes[CUR].scenes[i]; x.shot=null; save(); paintScene(i); }
 function scType(i,v){ const su=DB.episodes[CUR].scenes[i].rec.setups; su[su.length-1].type=v; save(); }
@@ -1024,7 +1036,7 @@ function scEnd(i){ const x=DB.episodes[CUR].scenes[i];
   const _e=DB.episodes[CUR];
   const _rem=_e.scenes.filter(y=>y!==x&&y.shot!=='N'&&!y.done);
   (_e.cast||[]).forEach(c=>{
-    if(!c.tOut&&x.cast&&x.cast.includes(c.name)&&!_rem.some(y=>y.cast&&y.cast.includes(c.name))) c.tOut=nowHM();
+    if(!c.tOut&&x.cast&&x.cast.includes(c.name)&&!_rem.some(y=>y.cast&&y.cast.includes(c.name))){ c.tOut=nowHM(); c.tOutAuto=true; }
   });
   save(); paintScene(i); }
 function scReopen(i){ const x=DB.episodes[CUR].scenes[i]; x.done=false;
@@ -1057,6 +1069,10 @@ function renderLive(e){
 /* ===== 체크 탭 — 실제 시간·배우 콜·인원·휴게·비용 ===== */
 function renderCheck(e){
   const H=(k,l,v,type='time')=>`<div><label class="f">${l}</label><input type="${type}" value="${esc(v)}" onchange="updQ(e=>{${k}=this.value})"></div>`;
+  /* v0.9 — 실제 시각은 「지금」 원터치 */
+  const HN=(k,l,v,id)=>`<div><label class="f">${l}</label><div style="display:flex;gap:5px;align-items:center">
+    <input type="time" id="hn${id}" value="${esc(v)}" style="flex:1;min-width:0" onchange="updQ(e=>{${k}=this.value})">
+    <button class="btn" style="flex:0 0 auto;padding:7px 8px;font-size:11.5px" onclick="document.getElementById('hn${id}').value=nowHM();updQ(e=>{${k}=nowHM()})">지금</button></div></div>`;
 
   /* 배우 — 배우별 콜 체크 */
   let ca='<div class="card">';
@@ -1067,15 +1083,15 @@ function renderCheck(e){
     ca+=`<div style="display:grid;grid-template-columns:64px 1fr 1fr 1fr;gap:6px;margin-bottom:6px;align-items:center">
       <b style="font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</b>
       <input type="time" value="${c.planT}" onchange="updQ(e=>e.cast[${i}].planT=this.value)">
-      <input type="time" value="${c.tIn}" onchange="updQ(e=>e.cast[${i}].tIn=this.value)">
-      <input type="time" value="${c.tOut}" onchange="updQ(e=>e.cast[${i}].tOut=this.value)">
+      <input type="time" value="${c.tIn}" style="${c.tInAuto?'border-color:var(--gn)':''}" onchange="updQ(e=>{e.cast[${i}].tIn=this.value;e.cast[${i}].tInAuto=false})">
+      <input type="time" value="${c.tOut}" style="${c.tOutAuto?'border-color:var(--gn)':''}" onchange="updQ(e=>{e.cast[${i}].tOut=this.value;e.cast[${i}].tOutAuto=false})">
     </div>`;
   });
   if(!e.cast.length) ca+='<div class="hint">임포트한 콜타임 원문에서 배우를 찾지 못했습니다. 아래로 추가하세요.</div>';
   ca+=`<div style="display:flex;gap:6px;margin-top:8px">
     <input type="text" id="newCast" placeholder="배우명" style="flex:1">
     <button class="btn" style="flex:0 0 auto" onclick="addCast()">＋ 추가</button></div>
-  <div class="hint" style="margin-top:6px">아웃 시간은 그 배우의 마지막 씬 종료 시 자동 기입(수정 가능).</div></div>`;
+  <div class="hint" style="margin-top:6px">진입은 첫 출연 씬 시작 시, 아웃은 마지막 출연 씬 종료 시 자동 기입. 초록 테두리 = 자동값(수정하면 자동 해제).</div></div>`;
 
   /* 무술 — 그룹 */
   const mv=e.varCrew['무술'];
@@ -1133,9 +1149,9 @@ function renderCheck(e){
 
   document.getElementById('epBody').innerHTML=`
     <h3 class="sec">실제 시간</h3><div class="card"><div class="grid4">
-      ${H("e.actual.gather",'실제 집결',e.actual.gather)}
-      ${H("e.actual.call",'실제 콜시작',e.actual.call)}
-      ${H("e.actual.end",'실제 종료',e.actual.end)}
+      ${HN("e.actual.gather",'실제 집결',e.actual.gather,'G')}
+      ${HN("e.actual.call",'실제 콜시작',e.actual.call,'C')}
+      ${HN("e.actual.end",'실제 종료',e.actual.end,'E')}
       <div><label class="f">휴게(h)</label><div class="stepper">
         <button onclick="stpRestA(-1)">−</button><span class="val" id="restAV">${e.actual.rest??1}</span><button onclick="stpRestA(1)">＋</button></div></div>
     </div>
@@ -1390,6 +1406,7 @@ function renderResult(e){
     }).join('');
     document.getElementById('epBody').innerHTML=`
       <h3 class="sec">당일 결산 — ${esc(e.date||CUR)}</h3>${toggle}
+      ${cidxDay(e)}
       <h3 class="sec">산출량</h3>
       <div class="fgrid">
         ${mcell('DPP · 촬영 페이지', fmtN(m.dpp), '/'+fmtN(m.pgPlan)+'p', 'var(--or)', ZONES.dpp(m.dpp),'dpp')}
@@ -1505,6 +1522,7 @@ function renderResult(e){
     }).join('');
     document.getElementById('epBody').innerHTML=`
       <h3 class="sec">누적 분석 — ${CUMW===0?'전체 '+n+'회차':'최근 '+n+'회차'}</h3>${toggle}${wsel}
+      ${cidxCum(win)}
       <h3 class="sec">산출량 (회 평균)</h3>
       <div class="fgrid">
         ${mcell('DPP · 페이지/회', fmtN(aDpp), 'p', 'var(--or)', ZONES.dpp(aDpp),'dpp')}
@@ -2119,13 +2137,224 @@ function closeMx(){
 document.body.insertAdjacentHTML('beforeend',
   '<div id="mxov" onclick="closeMx()"></div><div id="mxsheet"><div id="mxgrip"></div><div id="mxbody"></div></div>');
 
+/* ===== v0.9 — 종합지수 엔진 (설계 v0.3.1: DPS·PEI·RPS·TG·wTV) ===== */
+function poolBase(){
+  const eps=Object.keys(DB.episodes).sort().map(k=>({k,e:DB.episodes[k],m:metricsOf(DB.episodes[k])}))
+    .filter(x=>x.m.pgShot>0||x.m.hasLive);
+  let pgAdj=0,sh=0,suSum=0,tk=0; const ty={};
+  eps.forEach(x=>{const m=x.m;
+    if(m.shootH>0){ pgAdj+=(m.dppAdj!=null?m.dppAdj:(m.pgShot||0)); sh+=m.shootH; }
+    if(m.takes>0&&m.suMinAll.length){ suSum+=m.suMinAll.reduce((a,b)=>a+b,0); tk+=m.takes; }
+    Object.entries(m.suByType||{}).forEach(([t,v])=>{ if(!ty[t])ty[t]={n:0,min:0}; ty[t].n+=v.n; ty[t].min+=v.min; });
+  });
+  const suType={}; Object.entries(ty).forEach(([t,v])=>{ if(v.n>0) suType[t]=v.min/v.n; });
+  return {n:eps.length, eps, pace: sh>0? pgAdj/sh:null, takeMin: tk>0? suSum/tk:null, suType};
+}
+function wrapErrOf(e){ return (e&&e.plan&&e.plan.end&&e.actual&&e.actual.end)? toMin(e.actual.end)-toMin(e.plan.end) : null; }
+function epIndices(e,pb){
+  const m=metricsOf(e), out={m};
+  out.util=(m.shootH&&m.c2w)? m.shootH/m.c2w : null;
+  const paceRaw=(m.shootH>0)? ((m.dppAdj!=null?m.dppAdj:m.pgShot)||0)/m.shootH : null;
+  out.pace=(paceRaw!=null&&pb.pace)? paceRaw/pb.pace : null;
+  out.q=m.okr;
+  out.pei=(out.util!=null&&out.pace!=null&&out.q!=null)? out.util*out.pace*out.q : null;
+  const sp=DB.settings.stdPages;
+  out.dps=(sp>0&&m.okr!=null&&m.pgShot>0)? ((m.dppAdj!=null?m.dppAdj:m.pgShot)/sp + m.okr) : null;
+  out.drps=(m.spi!=null&&m.takes>0)? {a:m.spi, b:Math.max(0,1-(m.dNGR||0)-(m.rtr||0))} : null;
+  let exp=0,cnt=0;
+  Object.entries(m.suByType||{}).forEach(([t,v])=>{ if(pb.suType[t]!=null){ exp+=pb.suType[t]*v.n; cnt+=v.n; } });
+  const spd=(cnt>0&&m.suAvgMin)? (exp/cnt)/m.suAvgMin : null;
+  out.crps=(spd!=null&&m.takes>0)? {a:spd, b:Math.max(0,1-(m.tNGR3||0))} : null;
+  const tg={ng:0,cta:0,wrap:0,setup:0};
+  if(m.ngSum&&pb.takeMin) tg.ng=-m.ngSum*pb.takeMin;
+  if(m.callDelay!=null&&m.callDelay>0) tg.cta=-m.callDelay;
+  const we=wrapErrOf(e); if(we!=null) tg.wrap=-we;
+  Object.entries(m.suByType||{}).forEach(([t,v])=>{ if(pb.suType[t]!=null) tg.setup+=pb.suType[t]*v.n - v.min; });
+  tg.sum=tg.ng+tg.cta+tg.wrap+tg.setup;
+  out.tg=tg;
+  out.wtv=(m.c2w&&m.takes>0)? 1+tg.sum/(m.c2w*60) : null;
+  return out;
+}
+const fmt2=v=> v==null?'–':(+v).toFixed(2);
+function rpsCell(lbl,r,band,key){
+  return mcell(lbl, r? (r.a+r.b).toFixed(2):'–', r? '· '+r.a.toFixed(2)+'+'+r.b.toFixed(2):'', band, null, key);
+}
+function prpsOf(entries){
+  const ct=entries.map(x=>x.m.callDelay).filter(v=>v!=null);
+  const wr=entries.map(x=>wrapErrOf(x.e||DB.episodes[x.k])).filter(v=>v!=null);
+  if(!ct.length&&!wr.length) return '–';
+  const on=ct.length? ct.filter(v=>v<=0).length/ct.length : 0;
+  const wp=wr.length? wr.filter(v=>Math.abs(v)<=30).length/wr.length : 0;
+  return (on+wp).toFixed(2);
+}
+function cidxDay(e){
+  const pb=poolBase(), ix=epIndices(e,pb), tg=ix.tg;
+  const selfRef=pb.n<10? `<div class="hint" style="margin-bottom:7px">풀 ${pb.n}회차 — 기준선은 자기 풀 임시값(10회차부터 정식). 절대값보다 성분·추이로 판독.</div>`:'';
+  const arps=actorStats([{e}]).map(a=>({...a, rps:(a.aFTC!=null&&a.aNGR!=null)? a.aFTC+(1-a.aNGR):null})).filter(a=>a.rps!=null);
+  const acard=arps.length? '<h3 class="sec">aRPS — 배우 (당일)</h3><div class="card">'+arps.sort((x,y)=>y.rps-x.rps).map(a=>
+    `<div class="rrow"><span><b>${esc(a.name)}</b> ${a.takes}테이크</span><b>준비 ${(a.aFTC*100).toFixed(0)}% + 완성 ${((1-a.aNGR)*100).toFixed(0)}% = ${a.rps.toFixed(2)}</b></div>`).join('')+
+    '<div class="hint" style="margin-top:6px">개인 지표 — 거버넌스 6원칙(본인 열람 우선·외부 공개 금지). 정식 판독은 누적 100테이크부터.</div></div>':'';
+  const sgn=v=> (v>0?'+':'')+v.toFixed(0);
+  const tgcard=`<div class="card">
+    <div class="rrow"><span>NG 손실 (배우·연출·기술)</span><b style="color:${tg.ng<0?'var(--rd)':'var(--ink)'}">${sgn(tg.ng)}분</b></div>
+    <div class="rrow"><span>콜 지연 (연출부)</span><b style="color:${tg.cta<0?'var(--rd)':'var(--ink)'}">${sgn(tg.cta)}분</b></div>
+    <div class="rrow"><span>랩 조기/지연 (연출부)</span><b style="color:${tg.wrap>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.wrap)}분</b></div>
+    <div class="rrow"><span>셋업 득실 (촬영조명)</span><b style="color:${tg.setup>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.setup)}분</b></div>
+    <div class="rrow"><span><b>합계</b></span><b style="color:${tg.sum>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.sum)}분</b></div>
+    <div class="hint" style="margin-top:6px">풀 기준선 대비 득실(분). 분 × 분당 BTL 단가 = 원화 환산.</div></div>`;
+  return `<h3 class="sec">종합지수 (설계 v0.3.1)</h3>${selfRef}
+    <div class="fgrid">
+      ${mcell('PEI · 제작효율', fmt2(ix.pei), '', 'var(--gn)', null, 'pei')}
+      ${mcell('DPS · 당일 속보', fmt2(ix.dps), '', 'var(--or)', null, 'dps')}
+      ${mcell('wTV · 시간효율', fmt2(ix.wtv), '', 'var(--bl)', null, 'wtv')}
+      ${mcell('TG 합계', tg? sgn(tg.sum):'–', '분', 'var(--cy)', null, 'tgsum')}
+    </div>
+    <div class="fgrid" style="margin-top:7px">
+      ${mcell('가동률', ix.util==null?'–':(ix.util*100).toFixed(0), '%', 'var(--cy)', null, 'pei')}
+      ${mcell('페이스', fmt2(ix.pace), '', 'var(--ye)', null, 'pei')}
+      ${mcell('품질 · OKR', ix.q==null?'–':(ix.q*100).toFixed(0), '%', 'var(--gn)', null, 'pei')}
+      ${mcell('풀 회차', pb.n, '/10', 'var(--bl)', null, 'pri')}
+    </div>
+    <h3 class="sec">역할성과 — RPS</h3>
+    <div class="fgrid">
+      ${rpsCell('dRPS · 연출', ix.drps, 'var(--or)', 'drps')}
+      ${rpsCell('cRPS · 촬영조명', ix.crps, 'var(--cy)', 'crps')}
+      ${mcell('pRPS · 연출부', prpsOf(poolBase().eps), '', 'var(--gn)', null, 'prps')}
+      ${mcell('기록 배우', arps.length, '명', 'var(--bl)', null, 'arps')}
+    </div>
+    ${acard}
+    <h3 class="sec">TG — 시간득실</h3>${tgcard}`;
+}
+function cidxCum(win){
+  const pb=poolBase();
+  const rows=win.map(x=>({k:x.k, ix:epIndices(DB.episodes[x.k],pb)}));
+  const avg=f=>{const v=rows.map(f).filter(x=>x!=null);return v.length? v.reduce((a,b)=>a+b,0)/v.length:null;};
+  const aPei=avg(r=>r.ix.pei), aWtv=avg(r=>r.ix.wtv);
+  const sTg=rows.reduce((a,r)=>a+(r.ix.tg?r.ix.tg.sum:0),0);
+  let pri=null;
+  if(pb.n>=10&&aPei!=null){
+    const all=pb.eps.map(x=>epIndices(x.e,pb).pei).filter(v=>v!=null);
+    const pa=all.length? all.reduce((a,b)=>a+b,0)/all.length : null;
+    if(pa) pri=aPei/pa*100;
+  }
+  const dA=avg(r=>r.ix.drps?r.ix.drps.a:null), dB=avg(r=>r.ix.drps?r.ix.drps.b:null);
+  const cA=avg(r=>r.ix.crps?r.ix.crps.a:null), cB=avg(r=>r.ix.crps?r.ix.crps.b:null);
+  return `<h3 class="sec">종합지수 (설계 v0.3.1 · 집계 창)</h3>
+    ${pb.n<10? '<div class="hint" style="margin-bottom:7px">풀 '+pb.n+'/10회차 — PRI+와 정식 기준선은 10회차부터. 현재는 자기 풀 임시 기준.</div>':''}
+    <div class="fgrid">
+      ${mcell('PEI 평균', fmt2(aPei), '', 'var(--gn)', null, 'pei')}
+      ${mcell('PRI+', pri==null?'–':pri.toFixed(0), pri==null?'표본 부족':'', 'var(--or)', null, 'pri')}
+      ${mcell('wTV 평균', fmt2(aWtv), '', 'var(--bl)', null, 'wtv')}
+      ${mcell('Σ TG', (sTg>0?'+':'')+sTg.toFixed(0), '분', 'var(--cy)', null, 'tgsum')}
+    </div>
+    <div class="fgrid" style="margin-top:7px">
+      ${rpsCell('dRPS 평균', dA!=null&&dB!=null?{a:dA,b:dB}:null, 'var(--or)', 'drps')}
+      ${rpsCell('cRPS 평균', cA!=null&&cB!=null?{a:cA,b:cB}:null, 'var(--cy)', 'crps')}
+      ${mcell('pRPS · 연출부', prpsOf(win), '', 'var(--gn)', null, 'prps')}
+      ${mcell('기준 페이스', pb.pace==null?'–':pb.pace.toFixed(2), 'p/h', 'var(--ye)', null, 'pei')}
+    </div>`;
+}
+/* 종합지수 상세 시트 사전 */
+Object.assign(MX,{
+pei:{n:'PEI',t:'Production Efficiency Index — 제작효율지수 (설계 v0.3.1)',
+  d:'가동률 × 페이스 × 품질의 곱. 「완벽한 촬영일의 몇 %」를 한 수로 답한다. 곱셈이라 한 성분의 낭비가 다른 성분으로 가려지지 않는다 — 제조업 OEE의 문법.',
+  f:'PEI = (순촬영÷콜투랩) × (SDI 보정 페이스÷풀 기준) × OKR',
+  zs:null,g:null,fmt:fmt2,
+  cv:c=>{const pb=poolBase(); if(c.mode==='day') return c.e? epIndices(c.e,pb).pei:null;
+    const v=c.win.map(x=>epIndices(DB.episodes[x.k],pb).pei).filter(x=>x!=null);
+    return v.length? v.reduce((a,b)=>a+b,0)/v.length:null;},
+  note:'구간(밴드)은 풀 10회차 후 자기 분포로 확정 — 그 전에는 절대값보다 성분 분해와 회차 간 비교로 판독. 성분이 서로 다른 경로로 같은 PEI를 만들 수 있다는 것이 이 지수의 핵심 정보다.',
+  extra:c=>{const pb=poolBase();
+    const rows=(c.mode==='day'? (c.e?[{k:CUR,ix:epIndices(c.e,pb)}]:[]) : c.win.map(x=>({k:x.k,ix:epIndices(DB.episodes[x.k],pb)})));
+    if(!rows.length) return '';
+    return '<h4 class="mxs">성분 분해 (회차별)</h4>'+mxRows(rows.map(r=>({l:r.k,
+      r:`가동 ${r.ix.util==null?'–':(r.ix.util*100).toFixed(0)}% × 페이스 ${fmt2(r.ix.pace)} × 품질 ${r.ix.q==null?'–':(r.ix.q*100).toFixed(0)}% = ${fmt2(r.ix.pei)}`})));}},
+dps:{n:'DPS',t:'Drama Production Score — 당일 속보치',
+  d:'산출률(난이도 보정 페이지 ÷ 회당 표준 페이지)과 품질률(OKR)의 단순 합. 풀 기준선 없이 회차 종료 즉시 나오는 유일한 종합지수 — PEI의 속보판.',
+  f:'DPS = (DPP-adj ÷ stdPages) + OKR',
+  zs:null,g:null,fmt:fmt2,
+  cv:c=>{const pb=poolBase(); if(c.mode==='day') return c.e? epIndices(c.e,pb).dps:null;
+    const v=c.win.map(x=>epIndices(DB.episodes[x.k],pb).dps).filter(x=>x!=null);
+    return v.length? v.reduce((a,b)=>a+b,0)/v.length:null;},
+  note:'작품 설정의 stdPages가 실측과 괴리되면 산출률이 왜곡된다 — 설정 갱신이 선결(A-40·41 시산에서 확인). 정밀 판정은 PEI로.',
+  extra:c=>''},
+wtv:{n:'wTV',t:'weighted Time Value — 시간효율률 (TG 기반 재정의)',
+  d:'당일 시간득실 합계를 콜투랩으로 정규화한 비율. 1.0 = 풀 기준선과 같은 효율, 1.0 초과 = 시간을 이긴 회차. v0.2의 이중차감 구조를 TG 기반으로 해소한 재정의판.',
+  f:'wTV = 1 + (Σ TG ÷ 콜투랩분)',
+  zs:null,g:null,fmt:fmt2,
+  cv:c=>{const pb=poolBase(); if(c.mode==='day') return c.e? epIndices(c.e,pb).wtv:null;
+    const v=c.win.map(x=>epIndices(DB.episodes[x.k],pb).wtv).filter(x=>x!=null);
+    return v.length? v.reduce((a,b)=>a+b,0)/v.length:null;},
+  note:'길이가 다른 촬영일을 같은 저울에 올릴 때 쓴다. 시즌 누적 가치(DAR)의 엔진 — 30회차부터.',
+  extra:c=>''},
+tgsum:{n:'TG',t:'Time Gained — 시간득실 합계 (분)',
+  d:'모든 사건을 풀 기준선 대비 「몇 분을 벌었나/잃었나」로 환산해 역할에 귀속한 합. NG 손실(배우·연출·기술) + 콜 지연·랩(연출부) + 셋업 득실(촬영조명).',
+  f:'Σ TG = NG손실 + 콜지연 + 랩득실 + 셋업득실 (골프 SG 문법)',
+  zs:null,g:null,fmt:v=>v==null?'–':(v>0?'+':'')+v.toFixed(0)+'분',
+  cv:c=>{const pb=poolBase(); if(c.mode==='day') return c.e? epIndices(c.e,pb).tg.sum:null;
+    return c.win.reduce((a,x)=>a+(epIndices(DB.episodes[x.k],pb).tg.sum||0),0);},
+  note:'분은 곧 돈이다 — 분 × 분당 BTL 단가(회당 BTL ÷ 콜투랩분)로 원화 환산. 검산 규칙: Σ역할 TG ≈ 당일 총 효율 격차(R3 검증 항목).',
+  extra:c=>{const pb=poolBase();
+    const rows=(c.mode==='day'? (c.e?[{k:CUR,tg:epIndices(c.e,pb).tg}]:[]) : c.win.map(x=>({k:x.k,tg:epIndices(DB.episodes[x.k],pb).tg})));
+    if(!rows.length) return '';
+    const s=v=>(v>0?'+':'')+v.toFixed(0);
+    return '<h4 class="mxs">회차별 분해</h4>'+mxRows(rows.map(r=>({l:r.k,
+      r:`NG ${s(r.tg.ng)} · 콜 ${s(r.tg.cta)} · 랩 ${s(r.tg.wrap)} · 셋업 ${s(r.tg.setup)} = ${s(r.tg.sum)}분`})));}},
+drps:{n:'dRPS',t:'연출 역할성과지수',
+  d:'소화율(SPI — 계획 분량을 팀으로 소화)과 판단율(1 − 디렉션NG율 − 재촬영률)의 합. 속도만 올리고 판단이 흔들리면 합이 오르지 않는다.',
+  f:'dRPS = SPI + (1 − dNGR − RTR)   · 범위 ~0–2',
+  zs:null,g:null,fmt:fmt2,
+  cv:c=>{const pb=poolBase(); const g=e=>{const r=epIndices(e,pb).drps; return r? r.a+r.b:null;};
+    if(c.mode==='day') return c.e? g(c.e):null;
+    const v=c.win.map(x=>g(DB.episodes[x.k])).filter(x=>x!=null);
+    return v.length? v.reduce((a,b)=>a+b,0)/v.length:null;},
+  note:'개인 식별 지표 — 거버넌스 6원칙 적용. 신호가 나오면 정밀 진단층(dFIP, 10회차+NG 정의 통일 후)으로 내려간다.',
+  extra:c=>''},
+crps:{n:'cRPS',t:'촬영·조명 역할성과지수',
+  d:'속도율(샷 종류 구성 보정 기준 셋업분 ÷ 실측)과 정밀률(1 − 기술NG율)의 합. 클로즈업이 많은 날이 불리해지지 않도록 기준선이 샷 종류를 보정한다.',
+  f:'cRPS = (기준 셋업분 ÷ 실측 평균) + (1 − tNGR)   · 범위 ~0–2+',
+  zs:null,g:null,fmt:fmt2,
+  cv:c=>{const pb=poolBase(); const g=e=>{const r=epIndices(e,pb).crps; return r? r.a+r.b:null;};
+    if(c.mode==='day') return c.e? g(c.e):null;
+    const v=c.win.map(x=>g(DB.episodes[x.k])).filter(x=>x!=null);
+    return v.length? v.reduce((a,b)=>a+b,0)/v.length:null;},
+  note:'팀 단위 익명 집계 원칙. 셋업 시간 기록 커버리지가 낮으면 속도율이 왜곡된다 — 측정 셋업 수를 함께 확인.',
+  extra:c=>''},
+prps:{n:'pRPS',t:'연출부 역할성과지수',
+  d:'정시율(콜타임을 지킨 회차 비율)과 적중률(랩 예측 ±30분 적중 비율)의 합. 「그렇게 되도록 짜고 준비했는가」 — 콜시트가 맞는 조직인가로 수렴한다.',
+  f:'pRPS = CTA 정시율 + WRP 적중률   · 집계 창 롤링 · 범위 0–2',
+  zs:null,g:null,fmt:v=>v==null?'–':v,
+  cv:c=>{const v=prpsOf(c.mode==='day'? poolBase().eps : c.win); return v==='–'?null:v;},
+  note:'조기 랩은 TG에서는 득(+분)이지만 여기서는 예측 실패다 — 결과와 계획 정확도를 분리해 보는 것이 의도된 설계.',
+  extra:c=>''},
+arps:{n:'aRPS',t:'배우 역할성과지수',
+  d:'준비율(aFTC — 첫 테이크에 끝내는 빈도)과 완성률(1 − 연기NG율)의 합. 「누수 없는 가치 있는 OK 연기」의 두 얼굴 — 준비되어 있는가, 정확한가.',
+  f:'aRPS = aFTC + (1 − aNGR)   · 개인별 · 범위 ~0–2',
+  zs:null,g:null,fmt:v=>v==null?'–':v,
+  cv:c=>null,
+  note:'개인 식별 지표 — 6원칙(본인 열람 우선·외부 공개 금지·인사 직접 사용 금지). 정식 판독 기준은 회차 수가 아니라 누적 100테이크. NG 기록 정의 통일 전에는 절대값 해석 보류.',
+  extra:c=>{if(!c.e) return '';
+    const as=actorStats(c.mode==='day'? [{e:c.e}] : c.win.map(x=>({e:DB.episodes[x.k]})));
+    const rows=as.map(a=>({...a,rps:(a.aFTC!=null&&a.aNGR!=null)?a.aFTC+(1-a.aNGR):null})).filter(a=>a.rps!=null).sort((x,y)=>y.rps-x.rps);
+    if(!rows.length) return '';
+    return '<h4 class="mxs">배우별 (테이크 수 병기)</h4>'+mxRows(rows.map(a=>({l:esc(a.name)+' · '+a.takes+'테이크',
+      r:`${(a.aFTC*100).toFixed(0)}% + ${((1-a.aNGR)*100).toFixed(0)}% = ${a.rps.toFixed(2)}`})));}},
+pri:{n:'PRI+',t:'Production Rate Index — PEI의 풀 상대화',
+  d:'집계 창 PEI를 풀 평균 PEI로 나눠 100 기준으로 상대화한 지수. 100 = 자기 풀 평균, 115 = 평균보다 15% 효율적.',
+  f:'PRI+ = 창 PEI ÷ 풀 평균 PEI × 100',
+  zs:null,g:null,fmt:v=>v==null?'–':(+v).toFixed(0),
+  cv:c=>null,
+  note:'활성 조건: 풀 10회차(참고치) / 30회차(정식·신뢰구간 병기). 미달 시 「표본 부족」으로 표시된다.',
+  extra:c=>''}
+});
+
 /* ---------- 합계 바 ---------- */
 function renderTotals(){
   const e=DB.episodes[CUR]; if(!e) return;
   const pgPlan=e.scenes.reduce((a,x)=>a+(x.pages||0),0);
   const shot=e.scenes.filter(x=>x.shot==='Y');
   const pgShot=shot.reduce((a,x)=>a+((x.pagesA??x.pages)||0),0);
-  const ngSum=e.scenes.reduce((a,x)=>a+ngTotal(x),0);
+  const ngSum=e.scenes.reduce((a,x)=>a+(recStats(x).ngSum||0),0); /* v0.9: 테크트리 기록 포함 */
   const suSum=(shot.length?shot:e.scenes).reduce((a,x)=>a+(x.setups||0),0);
   document.getElementById('totbar').innerHTML=`
     <span>계획 <b style="color:var(--ye)">${pgPlan.toFixed(1)}</b><span class="u">p</span></span>
