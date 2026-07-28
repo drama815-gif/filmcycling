@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0C1016">
-<title>FilmCycling Computer v0.9</title>
+<title>FilmCycling Computer v0.9.1</title>
 <style>
   :root{
     --bg:#0C1016; --panel:#151B24; --panel2:#1A222D; --line:#232B37; --ink:#F2F5F8; --sub:#7C8794;
@@ -179,7 +179,7 @@
   <div id="entryTiles"></div>
   <div style="position:absolute;top:6%;width:100%;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35);z-index:2">
     <div style="font-size:clamp(24px,4.5vw,40px);font-weight:900">FilmCycling Computer</div>
-    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.9 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
+    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.9.1 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
   </div>
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;z-index:1">
     <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" style="width:min(980px,100%);display:block">
@@ -301,7 +301,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </script>
 <script>
 /* ============================================================
-   FilmCycling Computer 앱 v0.9 — 종합지수(PEI·RPS·TG)·배우 자동 기록·원터치 입력
+   FilmCycling Computer 앱 v0.9.1 — 종합지수·배우 자동 기록·원터치 입력·위치 유형(LT)·이동 전환(MTT·MLR)
    ============================================================ */
 const LS_KEY='fcc_app_v01'; /* v0.1 데이터와 호환 유지 */
 
@@ -411,6 +411,7 @@ function migrate(e){
     if(sc.retake===undefined) sc.retake=false;
     if(sc.pagesA===undefined) sc.pagesA=null; /* 실제 페이지(1/8). null=계획 따름 */
     if(sc.kind===undefined) sc.kind=null;    /* 씬 성격 (DLG·EMO·ACT·GRP·INS·ETC) */
+    if(sc.lt===undefined) sc.lt=null;        /* v0.9.1 위치 유형 (OPN·INL·OSET·STU) */
     if(sc.linked===undefined) sc.linked=false; /* 앞 씬과 연결 촬영 */
     if(sc.note===undefined) sc.note='';        /* 비고 (플래시백 활용·미촬영 사유 등) */
   });
@@ -805,6 +806,8 @@ function renderBase(e){
         <div><label class="f">씬 성격 ★ ${x.kind?'':'(점선 = 자동 제안 — 탭하여 확정)'}</label>
           <div id="kind${i}" style="display:flex;gap:4px;flex-wrap:wrap">${kindBtns(i,x)}</div></div>
       </div>
+      <div style="margin-top:7px"><label class="f">위치 유형 ★ ${x.lt?'':'(점선 = 자동 제안 — 탭하여 확정)'}</label>
+        <div id="lt${i}" style="display:flex;gap:4px;flex-wrap:wrap">${ltBtns(i,x)}</div></div>
     </div>`;
   });
 
@@ -835,7 +838,7 @@ function renderBase(e){
     </div>
     ${e.callRaw? '<div class="hint" style="margin-top:7px">콜타임 원문: <span style="color:var(--cy)">'+esc(e.callRaw.replace(/\n/g,' · ').slice(0,90))+'</span></div>':''}</div>
     <h3 class="sec">씬 — 페이지 ★ (${e.scenes.length}씬)</h3>
-    <button class="btn block" style="margin:8px 0 4px" onclick="kindAll()">씬 성격 자동 제안 일괄 적용 — 미분류 씬만 (SDI 보정에 필요)</button>
+    <button class="btn block" style="margin:8px 0 4px" onclick="kindAll()">씬 성격·위치 유형 자동 제안 일괄 적용 — 미분류 씬만</button>
     <div class="hint" style="margin-bottom:8px">페이지 = 스케줄표 단위 소수 입력(반 페이지=0.5). 사전제작일지 씬 표에 「페이지」 열을 추가하면 자동으로 채워집니다. 셋업은 씬 기록 탭에서 자동 집계.</div>
     ${sc}
     <h3 class="sec">팀별 특이사항</h3><div class="card">${nt}</div>
@@ -844,10 +847,10 @@ function renderBase(e){
 
 /* v0.9 — 미분류 씬 성격 일괄 적용 (자동 제안 기반) */
 function kindAll(){
-  const e=DB.episodes[CUR]; let n=0;
-  e.scenes.forEach(sc=>{ if(!sc.kind){ sc.kind=suggestKind(sc); n++; } });
+  const e=DB.episodes[CUR]; let n=0, m=0;
+  e.scenes.forEach(sc=>{ if(!sc.kind){ sc.kind=suggestKind(sc); n++; } if(!sc.lt){ sc.lt=suggestLT(sc); m++; } });
   save(); renderEp();
-  alert(n? n+'개 씬에 자동 제안 성격을 적용했습니다. 씬별 버튼으로 수정 가능합니다.':'미분류 씬이 없습니다.');
+  alert((n||m)? '성격 '+n+'씬 · 위치 유형 '+m+'씬에 자동 제안을 적용했습니다. 씬별 버튼으로 수정 가능합니다.':'미분류 씬이 없습니다.');
 }
 /* 씬 성격 버튼 (자동 제안 = 점선 강조) */
 function kindBtns(i,x){
@@ -1407,6 +1410,7 @@ function renderResult(e){
     document.getElementById('epBody').innerHTML=`
       <h3 class="sec">당일 결산 — ${esc(e.date||CUR)}</h3>${toggle}
       ${cidxDay(e)}
+      ${ltSection(e)}
       <h3 class="sec">산출량</h3>
       <div class="fgrid">
         ${mcell('DPP · 촬영 페이지', fmtN(m.dpp), '/'+fmtN(m.pgPlan)+'p', 'var(--or)', ZONES.dpp(m.dpp),'dpp')}
@@ -2148,7 +2152,9 @@ function poolBase(){
     Object.entries(m.suByType||{}).forEach(([t,v])=>{ if(!ty[t])ty[t]={n:0,min:0}; ty[t].n+=v.n; ty[t].min+=v.min; });
   });
   const suType={}; Object.entries(ty).forEach(([t,v])=>{ if(v.n>0) suType[t]=v.min/v.n; });
-  return {n:eps.length, eps, pace: sh>0? pgAdj/sh:null, takeMin: tk>0? suSum/tk:null, suType};
+  let mv=0,mvN=0;
+  eps.forEach(x=>{ if(x.m.scenesY>1){ mv+=transOf(x.e).move; mvN++; } });
+  return {n:eps.length, eps, pace: sh>0? pgAdj/sh:null, takeMin: tk>0? suSum/tk:null, suType, mttAvg: mvN? mv/mvN:null};
 }
 function wrapErrOf(e){ return (e&&e.plan&&e.plan.end&&e.actual&&e.actual.end)? toMin(e.actual.end)-toMin(e.plan.end) : null; }
 function epIndices(e,pb){
@@ -2170,7 +2176,8 @@ function epIndices(e,pb){
   if(m.callDelay!=null&&m.callDelay>0) tg.cta=-m.callDelay;
   const we=wrapErrOf(e); if(we!=null) tg.wrap=-we;
   Object.entries(m.suByType||{}).forEach(([t,v])=>{ if(pb.suType[t]!=null) tg.setup+=pb.suType[t]*v.n - v.min; });
-  tg.sum=tg.ng+tg.cta+tg.wrap+tg.setup;
+  tg.move=(pb.mttAvg!=null&&m.scenesY>1)? pb.mttAvg - transOf(e).move : 0; /* v0.9.1 이동 전환 득실 */
+  tg.sum=tg.ng+tg.cta+tg.wrap+tg.setup+tg.move;
   out.tg=tg;
   out.wtv=(m.c2w&&m.takes>0)? 1+tg.sum/(m.c2w*60) : null;
   return out;
@@ -2200,6 +2207,7 @@ function cidxDay(e){
     <div class="rrow"><span>콜 지연 (연출부)</span><b style="color:${tg.cta<0?'var(--rd)':'var(--ink)'}">${sgn(tg.cta)}분</b></div>
     <div class="rrow"><span>랩 조기/지연 (연출부)</span><b style="color:${tg.wrap>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.wrap)}분</b></div>
     <div class="rrow"><span>셋업 득실 (촬영조명)</span><b style="color:${tg.setup>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.setup)}분</b></div>
+    <div class="rrow"><span>이동 전환 (연출부·제작)</span><b style="color:${tg.move>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.move)}분</b></div>
     <div class="rrow"><span><b>합계</b></span><b style="color:${tg.sum>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.sum)}분</b></div>
     <div class="hint" style="margin-top:6px">풀 기준선 대비 득실(분). 분 × 분당 BTL 단가 = 원화 환산.</div></div>`;
   return `<h3 class="sec">종합지수 (설계 v0.3.1)</h3>${selfRef}
@@ -2288,8 +2296,8 @@ wtv:{n:'wTV',t:'weighted Time Value — 시간효율률 (TG 기반 재정의)',
   note:'길이가 다른 촬영일을 같은 저울에 올릴 때 쓴다. 시즌 누적 가치(DAR)의 엔진 — 30회차부터.',
   extra:c=>''},
 tgsum:{n:'TG',t:'Time Gained — 시간득실 합계 (분)',
-  d:'모든 사건을 풀 기준선 대비 「몇 분을 벌었나/잃었나」로 환산해 역할에 귀속한 합. NG 손실(배우·연출·기술) + 콜 지연·랩(연출부) + 셋업 득실(촬영조명).',
-  f:'Σ TG = NG손실 + 콜지연 + 랩득실 + 셋업득실 (골프 SG 문법)',
+  d:'모든 사건을 풀 기준선 대비 「몇 분을 벌었나/잃었나」로 환산해 역할에 귀속한 합. NG 손실(배우·연출·기술) + 콜 지연·랩(연출부) + 셋업 득실(촬영조명) + 이동 전환 득실(연출부·제작).',
+  f:'Σ TG = NG손실 + 콜지연 + 랩득실 + 셋업득실 + 이동득실 (골프 SG 문법)',
   zs:null,g:null,fmt:v=>v==null?'–':(v>0?'+':'')+v.toFixed(0)+'분',
   cv:c=>{const pb=poolBase(); if(c.mode==='day') return c.e? epIndices(c.e,pb).tg.sum:null;
     return c.win.reduce((a,x)=>a+(epIndices(DB.episodes[x.k],pb).tg.sum||0),0);},
@@ -2299,7 +2307,7 @@ tgsum:{n:'TG',t:'Time Gained — 시간득실 합계 (분)',
     if(!rows.length) return '';
     const s=v=>(v>0?'+':'')+v.toFixed(0);
     return '<h4 class="mxs">회차별 분해</h4>'+mxRows(rows.map(r=>({l:r.k,
-      r:`NG ${s(r.tg.ng)} · 콜 ${s(r.tg.cta)} · 랩 ${s(r.tg.wrap)} · 셋업 ${s(r.tg.setup)} = ${s(r.tg.sum)}분`})));}},
+      r:`NG ${s(r.tg.ng)} · 콜 ${s(r.tg.cta)} · 랩 ${s(r.tg.wrap)} · 셋업 ${s(r.tg.setup)} · 이동 ${s(r.tg.move||0)} = ${s(r.tg.sum)}분`})));}},
 drps:{n:'dRPS',t:'연출 역할성과지수',
   d:'소화율(SPI — 계획 분량을 팀으로 소화)과 판단율(1 − 디렉션NG율 − 재촬영률)의 합. 속도만 올리고 판단이 흔들리면 합이 오르지 않는다.',
   f:'dRPS = SPI + (1 − dNGR − RTR)   · 범위 ~0–2',
@@ -2345,6 +2353,106 @@ pri:{n:'PRI+',t:'Production Rate Index — PEI의 풀 상대화',
   zs:null,g:null,fmt:v=>v==null?'–':(+v).toFixed(0),
   cv:c=>null,
   note:'활성 조건: 풀 10회차(참고치) / 30회차(정식·신뢰구간 병기). 미달 시 「표본 부족」으로 표시된다.',
+  extra:c=>''}
+});
+
+/* ===== v0.9.1 — 씬 위치 유형(LT) · 이동 전환 지표 (MTT·MLR) ===== */
+const LTS=[['OPN','오픈 야외'],['INL','실내 로케'],['OSET','야외 오픈세트'],['STU','스튜디오']];
+const LTN=Object.fromEntries(LTS.map(x=>[x[0],x[1]]));
+function suggestLT(sc){
+  if(sc.lso==='S') return 'STU';
+  if(sc.lso==='O') return 'OSET';
+  const t=(sc.loc||'')+' '+(sc.desc||'');
+  if(/실내|내부|주방|거실|사무실|병실|복도|로비|카페|교실|병원|상가|매장|가게|층\)|호\)|룸|점포/.test(t)) return 'INL';
+  return 'OPN';
+}
+function ltOf(sc){ return sc.lt || (sc.lso==='S'?'STU': sc.lso==='O'?'OSET': null); }
+function ltBtns(i,x){
+  const sug=x.lt? null : suggestLT(x);
+  return LTS.map(([c,n])=>{
+    const on=x.lt===c, isSug=!x.lt&&sug===c;
+    const st=on? 'background:var(--or);color:#0C1016;border:1px solid var(--or)'
+      : isSug? 'background:var(--panel2);color:var(--or);border:1.5px dashed var(--or)'
+      : 'background:var(--panel2);color:var(--sub);border:1px solid var(--line)';
+    return `<button style="${st};border-radius:6px;padding:6px 8px;font-size:12px;font-weight:800;cursor:pointer" onclick="setLT(${i},'${c}')">${n}</button>`;
+  }).join('');
+}
+function setLT(i,c){ const x=DB.episodes[CUR].scenes[i]; x.lt = x.lt===c? null : c; save();
+  const el=document.getElementById('lt'+i); if(el) el.innerHTML=ltBtns(i,x); }
+/* 씬 간 전환: 갭 = 다음 씬 시작 − 앞 씬 종료 (시간순, 휴게 차감, 6h 초과 갭 제외) */
+function transOf(e){
+  const sc=(e.scenes||[]).filter(x=>x.shot==='Y'&&x.tStart&&x.tEnd)
+    .slice().sort((a,b)=>toMin(a.tStart)-toMin(b.tStart));
+  const rows=[]; let move=0, hold=0;
+  for(let i=1;i<sc.length;i++){
+    let g=toMin(sc[i].tStart)-toMin(sc[i-1].tEnd);
+    if(g==null) continue; if(g<0) g+=1440; if(g<=0||g>360) continue;
+    (e.breaks||[]).forEach(b=>{ const b0=toMin(b.t0), b1=toMin(b.t1);
+      if(b0==null||b1==null) return;
+      const o=Math.min(toMin(sc[i].tStart),b1)-Math.max(toMin(sc[i-1].tEnd),b0);
+      if(o>0) g-=o; });
+    if(g<=0) continue;
+    const moved=((sc[i].loc||'').trim()!==(sc[i-1].loc||'').trim())||(ltOf(sc[i])!==ltOf(sc[i-1]));
+    rows.push({from:sc[i-1], to:sc[i], min:Math.round(g), moved});
+    if(moved) move+=g; else hold+=g;
+  }
+  return {rows, move:Math.round(move), hold:Math.round(hold), tot:Math.round(move+hold)};
+}
+function byLTof(e){
+  const o={};
+  (e.scenes||[]).forEach(x=>{
+    if(x.shot!=='Y') return;
+    const k=ltOf(x)||'미지정';
+    if(!o[k]) o[k]={scenes:0,pg:0,h:0,takes:0,ng:0,suMin:0,suN:0};
+    const b=o[k], st=recStats(x);
+    b.scenes++; b.pg+=((x.pagesA??x.pages)||0);
+    const dh=hdiff(x.tStart,x.tEnd); if(dh!=null) b.h+=dh;
+    if(!st.legacy){ b.takes+=st.takes; b.ng+=st.ngSum; }
+    if(st.suMin) st.suMin.forEach(mn=>{b.suMin+=mn;b.suN++;});
+  });
+  return o;
+}
+function ltSection(e){
+  const tr=transOf(e), c2w=metricsOf(e).c2w;
+  const mlr=(c2w)? tr.move/(c2w*60) : null;
+  const bl=byLTof(e); const ks=Object.entries(bl).filter(([,b])=>b.scenes>0);
+  const ltTable=ks.length? '<div class="card">'+ks.sort((a,b)=>b[1].pg-a[1].pg).map(([k,b])=>{
+    const pace=b.h>0? (b.pg/b.h).toFixed(2)+' p/h':'–';
+    const sst=b.suN? (b.suMin/b.suN).toFixed(0)+'분':'–';
+    const ngr=b.takes? Math.round(b.ng/b.takes*100)+'%':'–';
+    return `<div class="rrow"><span><b>${LTN[k]||k}</b> ${b.scenes}씬 · ${b.pg.toFixed(1)}p</span><b>페이스 ${pace} · 셋업 ${sst} · NG ${ngr}</b></div>`;
+  }).join('')+'<div class="hint" style="margin-top:6px">위치 유형별 효율. 미지정 씬은 기초 탭에서 유형을 지정하면 정확해집니다.</div></div>':'';
+  const list=tr.rows.filter(r=>r.moved).map(r=>
+    `<div class="rrow"><span>S ${esc(r.from.no)} → S ${esc(r.to.no)} <span class="tag" style="margin-left:4px">${esc((r.to.loc||'').replace(/\n/g,' ').slice(0,16))}</span></span><b style="color:${r.min>=30?'var(--rd)':'var(--ink)'}">${r.min}분</b></div>`).join('');
+  return `<h3 class="sec">장소 · 이동</h3>
+    <div class="fgrid">
+      ${mcell('이동 전환 합', tr.move, '분', 'var(--or)', null, 'mtt')}
+      ${mcell('MLR · 이동손실률', mlr==null?'–':(mlr*100).toFixed(0), '%', 'var(--rd)', null, 'mlr')}
+      ${mcell('동일 장소 대기', tr.hold, '분', 'var(--cy)', null, 'mtt')}
+      ${mcell('전환 횟수', tr.rows.filter(r=>r.moved).length, '회', 'var(--bl)', null, 'mtt')}
+    </div>
+    ${list? '<div class="card" style="margin-top:8px">'+list+'<div class="hint" style="margin-top:6px">씬 종료 → 다음 씬 시작 갭 중 장소가 바뀐 구간(휴게 기록 시간 차감). 30분 이상 = 빨강.</div></div>':''}
+    ${ltTable}`;
+}
+Object.assign(MX,{
+mtt:{n:'이동 전환',t:'Move Transition Time — 씬 간 이동·전환 시간',
+  d:'연속 촬영 씬 사이의 갭 중 장소(또는 위치 유형)가 바뀐 경계의 합(분). 휴게 기록과 겹친 시간은 차감하고, 동일 장소 갭은 「대기」로 분리 집계한다. 야외·로케 촬영일의 가동률 하락을 설명하는 지표.',
+  f:'MTT = Σ (다음 씬 시작 − 앞 씬 종료) · 장소 변경 경계만 · 휴게 차감',
+  zs:null,g:null,fmt:v=>v==null?'–':v+'분',
+  cv:c=>c.e? transOf(c.e).move:null,
+  note:'씬 배치 순서(스케줄 설계)의 품질이 여기서 드러난다 — TG의 「이동 전환」 항목으로 연출부·제작에 귀속. 같은 장소 씬을 몰아 찍었는지가 관건.',
+  extra:c=>{ if(!c.e) return '';
+    const tr=transOf(c.e); const rows=tr.rows.filter(r=>r.moved).sort((a,b)=>b.min-a.min);
+    if(!rows.length) return '<div class="hint">이동 전환 없음 — 단일 장소 촬영일이거나 시간 기록이 부족합니다.</div>';
+    return '<h4 class="mxs">전환 구간 (소요순)</h4>'+mxRows(rows.slice(0,8).map(r=>({
+      l:'S '+r.from.no+' → S '+r.to.no+' · '+((r.to.loc||'').replace(/\n/g,' ').slice(0,14)),
+      r:r.min+'분', cls:r.min>=30?'rd':undefined})));}},
+mlr:{n:'MLR',t:'Move Loss Ratio — 이동손실률',
+  d:'하루 구속 시간(콜투랩) 중 이동·장소 전환이 차지한 비율. 위치 유형 구성이 같은 날끼리 비교해야 공정하다.',
+  f:'MLR = Σ 이동 전환분 ÷ 콜투랩분',
+  zs:null,g:null,fmt:v=>v==null?'–':(v*100).toFixed(0)+'%',
+  cv:c=>{ if(!c.e) return null; const m=metricsOf(c.e); return m.c2w? transOf(c.e).move/(m.c2w*60):null; },
+  note:'가동률(순촬영÷콜투랩)의 손실분을 이동·대기·휴게로 분해할 때 이동 몫이 MLR이다. 구간 기준은 풀 축적 후 위치 유형 구성 보정과 함께 확정.',
   extra:c=>''}
 });
 
