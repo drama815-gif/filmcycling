@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0C1016">
-<title>FilmCycling Computer v0.3</title>
+<title>FilmCycling Computer v0.8</title>
 <style>
   :root{
     --bg:#0C1016; --panel:#151B24; --panel2:#1A222D; --line:#232B37; --ink:#F2F5F8; --sub:#7C8794;
@@ -128,6 +128,34 @@
   .rrow{display:flex;justify-content:space-between;font-size:14px;padding:8px 0;border-bottom:1px dashed var(--line);}
   .rrow b{font-variant-numeric:tabular-nums;}
 
+  /* v0.8 — 지표 상세 시트 */
+  .field.tap{cursor:pointer;transition:transform .08s;}
+  .field.tap:active{transform:scale(.965);}
+  .field .mxi{position:absolute;top:9px;right:11px;font-size:11px;font-weight:800;opacity:.5;}
+  #mxov{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:80;opacity:0;pointer-events:none;transition:opacity .2s;}
+  #mxov.on{opacity:1;pointer-events:auto;}
+  #mxsheet{position:fixed;left:0;right:0;bottom:0;max-height:80vh;overflow-y:auto;background:var(--panel);
+    border-top:1px solid var(--line);border-radius:18px 18px 0 0;z-index:81;
+    padding:6px 16px calc(26px + env(safe-area-inset-bottom));transform:translateY(103%);
+    transition:transform .24s ease;-webkit-overflow-scrolling:touch;box-shadow:0 -14px 44px rgba(0,0,0,.5);}
+  #mxsheet.on{transform:translateY(0);}
+  #mxgrip{width:42px;height:4px;border-radius:2px;background:var(--line);margin:6px auto 12px;}
+  #mxbody{position:relative;max-width:840px;margin:0 auto;}
+  .mxhd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-right:38px;}
+  .mxhd .nm{font-size:18px;font-weight:900;}
+  .mxhd .vv{font-size:27px;font-weight:900;font-variant-numeric:tabular-nums;margin-left:auto;}
+  .mxfull{font-size:12px;color:var(--sub);margin-top:3px;}
+  .mxclose{position:absolute;top:-2px;right:0;width:30px;height:30px;border-radius:50%;background:var(--panel2);
+    border:1px solid var(--line);color:var(--sub);font-size:14px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  h4.mxs{font-size:12px;font-weight:800;color:var(--sub);margin:15px 0 6px;letter-spacing:.05em;}
+  .mxdef{font-size:13.5px;line-height:1.65;}
+  .mxfor{font-size:12.5px;font-family:ui-monospace,'SF Mono',Menlo,monospace;background:var(--panel2);
+    border:1px solid var(--line);border-radius:8px;padding:8px 11px;line-height:1.6;}
+  .mxz{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 9px;border-radius:7px;margin-bottom:2px;}
+  .mxz.cur{background:var(--panel2);border:1px solid var(--line);font-weight:800;}
+  .mxwhy{font-size:13px;line-height:1.65;background:var(--panel2);border-left:3px solid var(--gn);border-radius:6px;padding:9px 11px;}
+
   /* 진입 */
   #entry{background:#F28C28;}
   #entryTiles{position:absolute;inset:0;}
@@ -151,7 +179,7 @@
   <div id="entryTiles"></div>
   <div style="position:absolute;top:6%;width:100%;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35);z-index:2">
     <div style="font-size:clamp(24px,4.5vw,40px);font-weight:900">FilmCycling Computer</div>
-    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.3 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
+    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.8 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
   </div>
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;z-index:1">
     <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" style="width:min(980px,100%);display:block">
@@ -273,7 +301,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </script>
 <script>
 /* ============================================================
-   FilmCycling Computer 앱 v0.2 — 기초·현장·결산
+   FilmCycling Computer 앱 v0.8 — 기초·현장·결산 · 지표 상세 시트
    ============================================================ */
 const LS_KEY='fcc_app_v01'; /* v0.1 데이터와 호환 유지 */
 
@@ -1326,11 +1354,12 @@ function kindTable(byKind){
     return `<div class="rrow"><span><b>${esc(KINDN[k]||k)}</b> ${b.scenes}씬 · ${b.pg.toFixed(1)}p</span><b>페이스 ${pace} · 셋업 ${sst} · NG ${ngr}</b></div>`;
   }).join('')+'</div>';
 }
-function mcell(lbl,val,unit,band,zone){
+function mcell(lbl,val,unit,band,zone,key){
   const z=zone? `<span class="pill" style="margin-left:5px;font-size:11px">${zone[0]}</span>`:'';
   const dark = band.includes('--ye'); /* 노랑 블록은 어두운 글씨 */
-  return `<div class="field solid ${dark?'darktx':''}" style="background:${band}">
-    <div class="lbl">${lbl}</div><div class="num">${val}<small>${unit}</small>${z}</div></div>`;
+  const tap = key&&typeof MX!=='undefined'&&MX[key];
+  return `<div class="field solid ${dark?'darktx':''}${tap?' tap':''}"${tap?` onclick="openMx('${key}')"`:''} style="background:${band}">
+    ${tap?'<div class="mxi">ⓘ</div>':''}<div class="lbl">${lbl}</div><div class="num">${val}<small>${unit}</small>${z}</div></div>`;
 }
 const fmtN=(v,d=1)=> v==null?'–':(+v).toFixed(d);
 
@@ -1363,37 +1392,37 @@ function renderResult(e){
       <h3 class="sec">당일 결산 — ${esc(e.date||CUR)}</h3>${toggle}
       <h3 class="sec">산출량</h3>
       <div class="fgrid">
-        ${mcell('DPP · 촬영 페이지', fmtN(m.dpp), '/'+fmtN(m.pgPlan)+'p', 'var(--or)', ZONES.dpp(m.dpp))}
-        ${mcell('SPI · 계획 수행', fmtN(m.spi,2), '', 'var(--ye)', ZONES.spi(m.spi))}
-        ${mcell('SPD · 셋업', m.su||'–', '', 'var(--cy)', ZONES.spd(m.spd))}
-        ${mcell('SPP · 셋업/페이지', fmtN(m.spp,1), '', 'var(--bl)', ZONES.spp(m.spp))}
+        ${mcell('DPP · 촬영 페이지', fmtN(m.dpp), '/'+fmtN(m.pgPlan)+'p', 'var(--or)', ZONES.dpp(m.dpp),'dpp')}
+        ${mcell('SPI · 계획 수행', fmtN(m.spi,2), '', 'var(--ye)', ZONES.spi(m.spi),'spi')}
+        ${mcell('SPD · 셋업', m.su||'–', '', 'var(--cy)', ZONES.spd(m.spd),'spd')}
+        ${mcell('SPP · 셋업/페이지', fmtN(m.spp,1), '', 'var(--bl)', ZONES.spp(m.spp),'spp')}
       </div>
       <h3 class="sec">일정 · 시간</h3>
       <div class="fgrid">
-        ${mcell('OTR · 오버타임', m.otr==null?'–':(m.otr*100).toFixed(0), '%', 'var(--rd)', ZONES.otr(m.otr))}
-        ${mcell('CTA · 콜 지연', m.callDelay==null?'–':(m.callDelay<=0?'정시':'+'+m.callDelay), m.callDelay>0?'분':'', 'var(--gn)', ZONES.cta(m.callDelay))}
-        ${mcell('촬영시간 합', fmtN(m.shootH), 'h', 'var(--ye)', null)}
-        ${mcell('콜투랩', fmtN(m.c2w), 'h', 'var(--bl)', null)}
-        ${mcell('휴게 기록', m.breaksN? fmtN(m.breaksH):'–', m.breaksN? 'h · '+m.breaksN+'건':'', 'var(--cy)', null)}
+        ${mcell('OTR · 오버타임', m.otr==null?'–':(m.otr*100).toFixed(0), '%', 'var(--rd)', ZONES.otr(m.otr),'otr')}
+        ${mcell('CTA · 콜 지연', m.callDelay==null?'–':(m.callDelay<=0?'정시':'+'+m.callDelay), m.callDelay>0?'분':'', 'var(--gn)', ZONES.cta(m.callDelay),'cta')}
+        ${mcell('촬영시간 합', fmtN(m.shootH), 'h', 'var(--ye)', null,'shooth')}
+        ${mcell('콜투랩', fmtN(m.c2w), 'h', 'var(--bl)', null,'c2w')}
+        ${mcell('휴게 기록', m.breaksN? fmtN(m.breaksH):'–', m.breaksN? 'h · '+m.breaksN+'건':'', 'var(--cy)', null,'breaks')}
       </div>
       <h3 class="sec">품질 — 테이크 기반 (씬 기록 자동 집계)</h3>
       <div class="fgrid">
-        ${mcell('테이크 총', m.takes||'–', m.takes?'· OK '+m.ok:'', 'var(--bl)', null)}
-        ${mcell('TPS · 테이크/셋업', fmtN(m.tps,2), '', 'var(--cy)', ZONES.tps(m.tps))}
-        ${mcell('NGR · NG 비율', m.ngr==null?'–':(m.ngr*100).toFixed(0), '%', 'var(--rd)', ZONES.ngr(m.ngr))}
-        ${mcell('OKR · OK 비율', m.okr==null?'–':(m.okr*100).toFixed(0), '%', 'var(--gn)', ZONES.okr(m.okr))}
-        ${mcell('FTC · 1테이크 완료', m.ftc==null?'–':(m.ftc*100).toFixed(0), '%', 'var(--ye)', ZONES.ftc(m.ftc))}
-        ${mcell('RTR · 재촬영 씬', m.rtr==null?'–':(m.rtr*100).toFixed(0), '%', 'var(--or)', ZONES.rtr(m.rtr))}
-        ${mcell('NG 총 / 씬당', m.ngSum, m.ngScene!=null?'· '+fmtN(m.ngScene):'', 'var(--rd)', null)}
-        ${mcell('씬 촬영/미촬영', m.scenesY, '/'+m.scenesN, 'var(--gn)', null)}
+        ${mcell('테이크 총', m.takes||'–', m.takes?'· OK '+m.ok:'', 'var(--bl)', null,'takes')}
+        ${mcell('TPS · 테이크/셋업', fmtN(m.tps,2), '', 'var(--cy)', ZONES.tps(m.tps),'tps')}
+        ${mcell('NGR · NG 비율', m.ngr==null?'–':(m.ngr*100).toFixed(0), '%', 'var(--rd)', ZONES.ngr(m.ngr),'ngr')}
+        ${mcell('OKR · OK 비율', m.okr==null?'–':(m.okr*100).toFixed(0), '%', 'var(--gn)', ZONES.okr(m.okr),'okr')}
+        ${mcell('FTC · 1테이크 완료', m.ftc==null?'–':(m.ftc*100).toFixed(0), '%', 'var(--ye)', ZONES.ftc(m.ftc),'ftc')}
+        ${mcell('RTR · 재촬영 씬', m.rtr==null?'–':(m.rtr*100).toFixed(0), '%', 'var(--or)', ZONES.rtr(m.rtr),'rtr')}
+        ${mcell('NG 총 / 씬당', m.ngSum, m.ngScene!=null?'· '+fmtN(m.ngScene):'', 'var(--rd)', null,'ngsum')}
+        ${mcell('씬 촬영/미촬영', m.scenesY, '/'+m.scenesN, 'var(--gn)', null,'scenes')}
       </div>
       <h3 class="sec">대본 프로파일 — 씬 성격 (R1b)</h3>
       ${m.kindDone<e.scenes.length? '<div class="hint" style="margin-bottom:7px">미분류 '+(e.scenes.length-m.kindDone)+'씬 — 기초 탭에서 성격을 지정하면 SDI·유형별 효율이 정확해집니다.</div>':''}
       <div class="fgrid">
-        ${mcell('SDI · 대본 난이도', fmtN(m.sdi,2), '', 'var(--bl)', null)}
-        ${mcell('DPP-adj · 보정 산출', fmtN(m.dppAdj,1), 'p', 'var(--or)', null)}
-        ${mcell('분류 완료', m.kindDone, '/'+e.scenes.length+'씬', 'var(--cy)', null)}
-        ${mcell('SDI 기준', '1.00', '=표준 대사씬', 'var(--gn)', null)}
+        ${mcell('SDI · 대본 난이도', fmtN(m.sdi,2), '', 'var(--bl)', null,'sdi')}
+        ${mcell('DPP-adj · 보정 산출', fmtN(m.dppAdj,1), 'p', 'var(--or)', null,'dppadj')}
+        ${mcell('분류 완료', m.kindDone, '/'+e.scenes.length+'씬', 'var(--cy)', null,'kind')}
+        ${mcell('SDI 기준', '1.00', '=표준 대사씬', 'var(--gn)', null,'sdibase')}
       </div>
       ${kindTable(m.byKind)}
       ${(()=>{const as=actorStats([{e}]).slice(0,8);
@@ -1403,17 +1432,17 @@ function renderResult(e){
           '<div class="hint" style="margin-top:6px">개인 지표 — 거버넌스 6원칙(본인 열람 우선·외부 공개 금지) 적용 대상</div></div>';})()}
       <h3 class="sec">역할별 — 연출 · 스태프 (R1a)</h3>
       <div class="fgrid">
-        ${mcell('연출 dNGR · 디렉션NG', m.dNGR==null?'–':(m.dNGR*100).toFixed(0), '%', 'var(--or)', null)}
-        ${mcell('연출 씬당 소요', fmtN(m.scenePace,1), 'h', 'var(--ye)', null)}
-        ${mcell('스태프 tNGR · 기술NG', m.tNGR3==null?'–':(m.tNGR3*100).toFixed(0), '%', 'var(--cy)', null)}
-        ${mcell('스태프 SST 평균', fmtN(m.suAvgMin,0), '분', 'var(--bl)', null)}
+        ${mcell('연출 dNGR · 디렉션NG', m.dNGR==null?'–':(m.dNGR*100).toFixed(0), '%', 'var(--or)', null,'dngr')}
+        ${mcell('연출 씬당 소요', fmtN(m.scenePace,1), 'h', 'var(--ye)', null,'pace')}
+        ${mcell('스태프 tNGR · 기술NG', m.tNGR3==null?'–':(m.tNGR3*100).toFixed(0), '%', 'var(--cy)', null,'tngr')}
+        ${mcell('스태프 SST 평균', fmtN(m.suAvgMin,0), '분', 'var(--bl)', null,'sst')}
       </div>
       <h3 class="sec">셋업 시간 — 촬영·조명 효율 (자동 측정)</h3>
       <div class="fgrid">
-        ${mcell('평균 셋업 시간', fmtN(m.suAvgMin,0), '분', 'var(--cy)', null)}
-        ${mcell('최장 셋업', fmtN(m.suMaxMin,0), '분', 'var(--or)', null)}
-        ${mcell('측정 셋업', m.suMinAll.length, '/'+(m.su||0), 'var(--bl)', null)}
-        ${mcell('시간당 셋업', m.suAvgMin?fmtN(60/m.suAvgMin,1):'–', '', 'var(--gn)', null)}
+        ${mcell('평균 셋업 시간', fmtN(m.suAvgMin,0), '분', 'var(--cy)', null,'suavg')}
+        ${mcell('최장 셋업', fmtN(m.suMaxMin,0), '분', 'var(--or)', null,'sumax')}
+        ${mcell('측정 셋업', m.suMinAll.length, '/'+(m.su||0), 'var(--bl)', null,'sun')}
+        ${mcell('시간당 셋업', m.suAvgMin?fmtN(60/m.suAvgMin,1):'–', '', 'var(--gn)', null,'suph')}
       </div>
       ${Object.keys(m.suByType).length? '<div class="card" style="margin-top:8px">'+
         Object.entries(m.suByType).sort((a,b)=>b[1].min/b[1].n-a[1].min/a[1].n).map(([ty,v])=>
@@ -1428,10 +1457,10 @@ function renderResult(e){
       })()}
       <h3 class="sec">자원 — 비용</h3>
       <div class="fgrid">
-        ${mcell('당일 BTL 합', costTotal(e)?Math.round(costTotal(e)/10000).toLocaleString():'–', '만원', 'var(--ye)', null)}
-        ${mcell('BUR · 예산 편차', m.bur==null?'–':(m.bur>0?'+':'')+m.bur.toFixed(1), '%p', 'var(--or)', ZONES.bur(m.bur))}
-        ${mcell('회당 BTL 표준', Math.round(DB.settings.stdBTL/100000000*10)/10, '억', 'var(--bl)', null)}
-        ${mcell('비용 입력', Object.keys(e.costs).length, '/9항목', 'var(--cy)', null)}
+        ${mcell('당일 BTL 합', costTotal(e)?Math.round(costTotal(e)/10000).toLocaleString():'–', '만원', 'var(--ye)', null,'btl')}
+        ${mcell('BUR · 예산 편차', m.bur==null?'–':(m.bur>0?'+':'')+m.bur.toFixed(1), '%p', 'var(--or)', ZONES.bur(m.bur),'bur')}
+        ${mcell('회당 BTL 표준', Math.round(DB.settings.stdBTL/100000000*10)/10, '억', 'var(--bl)', null,'stdbtl')}
+        ${mcell('비용 입력', Object.keys(e.costs).length, '/9항목', 'var(--cy)', null,'costin')}
       </div>
       <h3 class="sec">NG 분포 — 5코드</h3><div class="card">${ngbar}${nglg}</div>
       <h3 class="sec">배우 — 콜 대비 실제</h3><div class="card">${castRows}</div>
@@ -1478,35 +1507,35 @@ function renderResult(e){
       <h3 class="sec">누적 분석 — ${CUMW===0?'전체 '+n+'회차':'최근 '+n+'회차'}</h3>${toggle}${wsel}
       <h3 class="sec">산출량 (회 평균)</h3>
       <div class="fgrid">
-        ${mcell('DPP · 페이지/회', fmtN(aDpp), 'p', 'var(--or)', ZONES.dpp(aDpp))}
-        ${mcell('SPI · 계획 수행', fmtN(aSpi,2), '', 'var(--ye)', ZONES.spi(aSpi))}
-        ${mcell('SPD · 셋업/회', fmtN(aSpd,0), '', 'var(--cy)', ZONES.spd(aSpd))}
-        ${mcell('SPP · 셋업/페이지', fmtN(aSpp,1), '', 'var(--bl)', ZONES.spp(aSpp))}
+        ${mcell('DPP · 페이지/회', fmtN(aDpp), 'p', 'var(--or)', ZONES.dpp(aDpp),'dpp')}
+        ${mcell('SPI · 계획 수행', fmtN(aSpi,2), '', 'var(--ye)', ZONES.spi(aSpi),'spi')}
+        ${mcell('SPD · 셋업/회', fmtN(aSpd,0), '', 'var(--cy)', ZONES.spd(aSpd),'spd')}
+        ${mcell('SPP · 셋업/페이지', fmtN(aSpp,1), '', 'var(--bl)', ZONES.spp(aSpp),'spp')}
       </div>
       <h3 class="sec">일정 · 시간</h3>
       <div class="fgrid">
-        ${mcell('OTR 평균', aOtr==null?'–':(aOtr*100).toFixed(0), '%', 'var(--rd)', ZONES.otr(aOtr))}
-        ${mcell('CTA · 정시 시작률', fmtN(pCta,0), '%', 'var(--gn)', ZONES.ctaPct(pCta))}
-        ${mcell('WRP · 랩 예측 적중', fmtN(pWrp,0), '%', 'var(--cy)', ZONES.wrp(pWrp))}
-        ${mcell('콜투랩 평균', fmtN(aC2w), 'h', 'var(--bl)', null)}
+        ${mcell('OTR 평균', aOtr==null?'–':(aOtr*100).toFixed(0), '%', 'var(--rd)', ZONES.otr(aOtr),'otr')}
+        ${mcell('CTA · 정시 시작률', fmtN(pCta,0), '%', 'var(--gn)', ZONES.ctaPct(pCta),'ctapct')}
+        ${mcell('WRP · 랩 예측 적중', fmtN(pWrp,0), '%', 'var(--cy)', ZONES.wrp(pWrp),'wrp')}
+        ${mcell('콜투랩 평균', fmtN(aC2w), 'h', 'var(--bl)', null,'c2w')}
       </div>
       <h3 class="sec">품질 (테이크 기반 평균)</h3>
       <div class="fgrid">
-        ${mcell('TPS', fmtN(aTps,2), '', 'var(--cy)', ZONES.tps(aTps))}
-        ${mcell('NGR', aNgr==null?'–':(aNgr*100).toFixed(0), '%', 'var(--rd)', ZONES.ngr(aNgr))}
-        ${mcell('FTC', aFtc==null?'–':(aFtc*100).toFixed(0), '%', 'var(--ye)', ZONES.ftc(aFtc))}
-        ${mcell('RTR', aRtr==null?'–':(aRtr*100).toFixed(1), '%', 'var(--or)', ZONES.rtr(aRtr))}
+        ${mcell('TPS', fmtN(aTps,2), '', 'var(--cy)', ZONES.tps(aTps),'tps')}
+        ${mcell('NGR', aNgr==null?'–':(aNgr*100).toFixed(0), '%', 'var(--rd)', ZONES.ngr(aNgr),'ngr')}
+        ${mcell('FTC', aFtc==null?'–':(aFtc*100).toFixed(0), '%', 'var(--ye)', ZONES.ftc(aFtc),'ftc')}
+        ${mcell('RTR', aRtr==null?'–':(aRtr*100).toFixed(1), '%', 'var(--or)', ZONES.rtr(aRtr),'rtr')}
       </div>
       <h3 class="sec">종합</h3>
       <div class="fgrid">
-        ${mcell('SRI (근사·가설)', fmtN(sri,2), '', sriZ?{ok:'var(--gn)',info:'var(--ye)',warn:'var(--or)',risk:'var(--rd)'}[sriZ[1]]:'var(--sub)', sriZ)}
-        ${mcell('BUR 평균', aBur==null?'–':(aBur>0?'+':'')+aBur.toFixed(1), '%p', 'var(--or)', ZONES.bur(aBur))}
-        ${mcell('NG/회', fmtN(aNg), '', 'var(--rd)', null)}
-        ${mcell('누적 페이지', fmtN(totPg), 'p', 'var(--gn)', null)}
-        ${mcell('집계 창', CUMW===0?'전체':CUMW+'회', '', 'var(--bl)', null)}
-        ${mcell('기록 회차', rec.length+'/'+all.length, '', 'var(--cy)', null)}
-        ${mcell('콜투랩 평균', fmtN(aC2w), 'h', 'var(--ye)', null)}
-        ${mcell('평균 셋업 시간', fmtN(aSuMin,0), '분', 'var(--cy)', null)}
+        ${mcell('SRI (근사·가설)', fmtN(sri,2), '', sriZ?{ok:'var(--gn)',info:'var(--ye)',warn:'var(--or)',risk:'var(--rd)'}[sriZ[1]]:'var(--sub)', sriZ,'sri')}
+        ${mcell('BUR 평균', aBur==null?'–':(aBur>0?'+':'')+aBur.toFixed(1), '%p', 'var(--or)', ZONES.bur(aBur),'bur')}
+        ${mcell('NG/회', fmtN(aNg), '', 'var(--rd)', null,'ngavg')}
+        ${mcell('누적 페이지', fmtN(totPg), 'p', 'var(--gn)', null,'totpg')}
+        ${mcell('집계 창', CUMW===0?'전체':CUMW+'회', '', 'var(--bl)', null,'winw')}
+        ${mcell('기록 회차', rec.length+'/'+all.length, '', 'var(--cy)', null,'reccnt')}
+        ${mcell('콜투랩 평균', fmtN(aC2w), 'h', 'var(--ye)', null,'c2w')}
+        ${mcell('평균 셋업 시간', fmtN(aSuMin,0), '분', 'var(--cy)', null,'suavg')}
       </div>
       ${(()=>{ /* ===== R1c 완성 예측 ===== */
         const s=DB.settings;
@@ -1540,10 +1569,10 @@ function renderResult(e){
         }
         return `<h3 class="sec">완성 예측 (R1c) — 매 회차 자동 갱신</h3>
         <div class="fgrid">
-          ${mcell('PGR · 진행률', (pgr*100).toFixed(1), '%', 'var(--or)', null)}
-          ${mcell('촬영 완료', fmtN(shotAll), '/'+s.totalPages+'p', 'var(--gn)', null)}
-          ${mcell('잔여 분량', fmtN(remain), 'p', 'var(--ye)', null)}
-          ${mcell('촬영일 간격 실측', fac.toFixed(1), '일', 'var(--cy)', null)}
+          ${mcell('PGR · 진행률', (pgr*100).toFixed(1), '%', 'var(--or)', null,'pgr')}
+          ${mcell('촬영 완료', fmtN(shotAll), '/'+s.totalPages+'p', 'var(--gn)', null,'shotall')}
+          ${mcell('잔여 분량', fmtN(remain), 'p', 'var(--ye)', null,'remain')}
+          ${mcell('촬영일 간격 실측', fac.toFixed(1), '일', 'var(--cy)', null,'fac')}
         </div>
         <div class="card">${scen}
         <div class="hint" style="margin-top:6px">유형별 페이스 분해 예측(대본 전체 씬 분류 필요)은 잔여 회차 임포트가 쌓이면 자동 정밀화. 시나리오 폭 = 불확실성.</div></div>`;
@@ -1594,6 +1623,501 @@ function renderResult(e){
       <div class="hint">SRI는 백테스트 전 가설 가중치의 근사값(DPP·SPI·OTR·NGR 합성). 컷 기반 지표(CPD·ASD·PCR)와 장비(EUR)는 촬영 메타 임포트(2단계)에서 자동 산출.</div>`;
   }
 }
+
+/* ===== v0.8 — 지표 상세 시트: 타일 탭 → 정의·산식·구간 기준·데이터 분석 ===== */
+function mxCtx(){
+  const all=Object.keys(DB.episodes).sort().map(k=>({k,e:DB.episodes[k],m:metricsOf(DB.episodes[k])}));
+  const rec=all.filter(x=>x.m.pgShot>0||x.m.hasLive);
+  const base=rec.length?rec:all;
+  const win=CUMW===0? base : base.slice(-CUMW);
+  const avg=f=>{const v=win.map(x=>f(x.m)).filter(x=>x!=null);return v.length? v.reduce((a,b)=>a+b,0)/v.length:null;};
+  const pct=f=>{const v=win.map(x=>f(x.m)).filter(x=>x!=null);return v.length? v.filter(Boolean).length/v.length*100:null;};
+  const e=CUR?DB.episodes[CUR]:null;
+  return {mode:RMODE,e,m:e?metricsOf(e):null,all,rec,base,win,avg,pct};
+}
+/* 회차별 추이 미니 차트 — 초록=집계 대상, 주황 점선=평균 */
+function mxTrend(c,g,fmt){
+  const rows=c.base.map(x=>({k:x.k,v:g(x.m)}));
+  const has=rows.filter(r=>r.v!=null);
+  if(has.length<2) return '';
+  const hiSet=new Set(c.mode==='day'? [CUR] : c.win.map(x=>x.k));
+  const inHi=has.filter(r=>hiSet.has(r.k));
+  const avgV=c.mode==='day'? has.reduce((s,r)=>s+r.v,0)/has.length
+           : (inHi.length? inHi.reduce((s,r)=>s+r.v,0)/inHi.length : null);
+  const vals=has.map(r=>r.v);
+  const mx=Math.max(...vals), mn=Math.min(0,...vals);
+  const W=680,H=64,n=rows.length,step=W/n,bw=Math.min(step*0.6,36);
+  const sc=v=>(v-mn)/(mx-mn||1)*(H-16);
+  let s='';
+  rows.forEach((r,i)=>{
+    if(r.v==null) return;
+    const h=Math.max(2,sc(r.v));
+    s+=`<rect x="${(i*step+(step-bw)/2).toFixed(1)}" y="${(H-2-h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${hiSet.has(r.k)?'#35C24D':'#3D4653'}"/>
+        <text x="${(i*step+step/2).toFixed(1)}" y="${H+10}" text-anchor="middle" font-size="8.5" fill="#7C8794">${r.k.replace('A-','')}</text>`;
+  });
+  if(avgV!=null){ const y=(H-2-sc(avgV)).toFixed(1);
+    s+=`<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="#FF7A00" stroke-width="1.5" stroke-dasharray="4 4"/>`; }
+  const lbl=c.mode==='day'? `초록 = 이 회차 · 점선 = 전체 평균 ${avgV!=null?fmt(avgV):''}` : `초록 = 집계 창 · 점선 = 창 평균 ${avgV!=null?fmt(avgV):''}`;
+  return `<h4 class="mxs">회차별 추이</h4><div class="card" style="margin-bottom:0">
+    <svg width="100%" height="80" viewBox="0 0 ${W} ${H+14}" preserveAspectRatio="none">${s}</svg>
+    <div class="hint" style="margin-top:4px">${lbl}</div></div>`;
+}
+function mxZones(zs,curLbl){
+  if(!zs||!zs.length) return '';
+  return '<h4 class="mxs">구간 기준 (표준수치 v0.1)</h4>'+zs.map(([rg,lb,cl])=>
+    `<div class="mxz ${curLbl===lb?'cur':''}"><span>${rg}</span><span class="pill ${cl}">${lb}</span></div>`).join('');
+}
+function mxNgBreak(ngAll,takes){
+  const tot=Object.values(ngAll||{}).reduce((a,b)=>a+b,0);
+  if(!tot) return '<div class="hint">NG 기록 없음</div>';
+  return '<div class="ngbar">'+NGC.filter(([c])=>ngAll[c]).map(([c])=>`<div style="flex:${ngAll[c]};background:${NGCOLOR[c]};${c==='03'?'color:#0C1016':''}">${ngAll[c]}</div>`).join('')+'</div>'
+    +'<div class="nglg">'+NGC.filter(([c])=>ngAll[c]).map(([c,n])=>`<span><span class="dot" style="background:${NGCOLOR[c]}"></span>${n} ${ngAll[c]}건 · ${Math.round(ngAll[c]/tot*100)}%${takes?' (테이크 대비 '+Math.round(ngAll[c]/takes*100)+'%)':''}</span>`).join('')+'</div>';
+}
+function mxRows(items){ /* [{l,r,cls?}] → rrow 목록 */
+  return items.map(x=>`<div class="rrow"><span>${x.l}</span><b${x.cls?` style="color:var(--${x.cls})"`:''}>${x.r}</b></div>`).join('');
+}
+/* 회차별 값 리스트 (상위 n, 정렬 기준 포함) */
+function mxEpList(c,g,fmt,desc){
+  const rows=c.win.map(x=>({k:x.k,v:g(x.m)})).filter(r=>r.v!=null);
+  if(!rows.length) return '';
+  rows.sort((a,b)=>desc? b.v-a.v : a.v-b.v);
+  return mxRows(rows.slice(0,8).map(r=>({l:r.k, r:fmt(r.v)})));
+}
+const MXPCT=v=>v==null?'–':(v*100).toFixed(0)+'%';
+const MXP1=v=>v==null?'–':fmtN(v)+'p';
+
+/* 지표 사전 — n 이름 / t 풀네임 / d 정의 / f 산식 / zk ZONES키 / zs 구간표 / g 회차 getter / fmt 표시 / cv 현재값 재정의 / note 점검 포인트 / extra 분석 HTML */
+const MX={
+dpp:{n:'DPP',t:'Daily Pages Produced — 회당 촬영 페이지',
+  d:'해당 회차(하루)에 촬영을 완료한 대본 페이지의 합. 실제 페이지가 입력된 씬은 실제값을, 없으면 계획 페이지를 사용한다. 산출량의 기본 단위.',
+  f:'DPP = Σ 촬영 완료(Y) 씬의 페이지',
+  zk:'dpp',zs:[['5p 미만','위험','risk'],['5 ~ 6p','주의','warn'],['6 ~ 8p','정상','info'],['8p 초과','속도형','warn']],
+  g:m=>m.dpp,fmt:MXP1,
+  note:'낮을 때 점검 순서: SPP(분할 과다) → 평균 셋업 시간(전환 지연) → NGR(테이크 소모) → 이동·대기. 높은데 NGR·RTR이 함께 높으면 속도 우선 운영의 품질 비용을 의심한다.',
+  extra:c=>{
+    if(c.mode==='day') return '';
+    const rows=c.win.map(x=>({k:x.k,v:x.m.dpp})).filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
+    if(rows.length<2) return '';
+    return '<h4 class="mxs">집계 창 내 최고 / 최저</h4>'+mxRows([
+      {l:'최고 '+rows[0].k, r:MXP1(rows[0].v), cls:'gn'},
+      {l:'최저 '+rows[rows.length-1].k, r:MXP1(rows[rows.length-1].v), cls:'rd'},
+      {l:'편차 (최고−최저)', r:MXP1(rows[0].v-rows[rows.length-1].v)}]);
+  }},
+spi:{n:'SPI',t:'Schedule Performance Index — 계획 수행 지수',
+  d:'계획한 분량 대비 실제 촬영한 분량의 비율. 1.00이면 계획 그대로, 1.00 초과는 계획보다 많이 찍은 것.',
+  f:'SPI = 촬영 페이지 ÷ 계획 페이지',
+  zk:'spi',zs:[['0.85 미만','지연','risk'],['0.85 ~ 0.95','주의','warn'],['0.95 ~ 1.10','정상','info'],['1.10 초과','과속','warn']],
+  g:m=>m.spi,fmt:v=>fmtN(v,2),
+  note:'과속(>1.10)은 좋은 신호만은 아니다 — 스케줄 자체가 느슨했거나, 품질을 당겨 쓴 결과일 수 있다. NGR·FTC와 교차 판독. 지연(<0.85)이 2회차 연속이면 잔여 스케줄 재배분 검토.',
+  extra:c=>{
+    const rows=(c.mode==='day'? [{k:CUR,m:c.m}] : c.win).map(x=>({k:x.k||CUR,plan:x.m.pgPlan,shot:x.m.pgShot}))
+      .filter(r=>r.plan>0);
+    if(!rows.length) return '';
+    return '<h4 class="mxs">계획 대비 실촬영 (회차별)</h4>'+mxRows(rows.slice(-8).map(r=>({
+      l:r.k, r:`계획 ${fmtN(r.plan)}p → 촬영 ${fmtN(r.shot)}p (${r.plan?fmtN(r.shot/r.plan,2):'–'})`,
+      cls:r.shot/r.plan<0.85?'rd':(r.shot/r.plan>1.1?'or':undefined)})));
+  }},
+spd:{n:'SPD',t:'Setups Per Day — 회당 셋업 수',
+  d:'하루에 소화한 셋업(카메라·조명 배치 단위)의 수. 현장의 회전 속도, 사이클 컴퓨터의 케이던스에 해당.',
+  f:'SPD = 회차 내 셋업 총수',
+  zk:'spd',zs:[['20 미만','저속','warn'],['20 ~ 35','정상','info'],['35 초과','고속','warn']],
+  g:m=>m.su||null,fmt:v=>fmtN(v,0),
+  note:'저속이면 평균 셋업 시간과 함께 본다 — 셋업당 시간이 정상인데 수가 적으면 촬영 외 시간(이동·대기·리허설)이 원인. 고속은 DPP가 따라오는지 확인(회전만 빠르고 분량이 안 나오면 잘게 쪼개고 있는 것).',
+  extra:c=>{
+    const bt=c.mode==='day'? c.m.suByType : (()=>{const o={};c.win.forEach(x=>Object.entries(x.m.suByType||{}).forEach(([ty,v])=>{if(!o[ty])o[ty]={n:0,min:0};o[ty].n+=v.n;o[ty].min+=v.min;}));return o;})();
+    const ks=Object.entries(bt||{});
+    if(!ks.length) return '';
+    return '<h4 class="mxs">샷 종류별 구성</h4>'+mxRows(ks.sort((a,b)=>b[1].n-a[1].n).map(([ty,v])=>({l:ty,r:v.n+'회 · 평균 '+(v.min&&v.n?(v.min/v.n).toFixed(0):'–')+'분'})));
+  }},
+spp:{n:'SPP',t:'Setups Per Page — 페이지당 셋업',
+  d:'대본 1페이지를 소화하는 데 쓴 셋업 수. 커버리지 밀도 — 같은 분량을 얼마나 잘게 나눠 찍었는지를 보여준다.',
+  f:'SPP = 셋업 총수 ÷ 촬영 페이지',
+  zk:'spp',zs:[['1 미만','저밀도','warn'],['1 ~ 3','정상','info'],['3 초과','고밀도','warn']],
+  g:m=>m.spp,fmt:v=>fmtN(v,1),
+  note:'고밀도는 두 얼굴이다 — 액션·감정씬의 촘촘한 커버리지(정당)일 수도, 불필요한 분할(낭비)일 수도 있다. SDI(대본 난이도)가 높으면 고밀도는 자연스럽다. SDI가 낮은데 SPP만 높으면 콘티 단계 점검.',
+  extra:c=>mxEpList(c,m=>m.spp,v=>fmtN(v,1),true)? '<h4 class="mxs">회차별 SPP (높은 순)</h4>'+mxEpList(c,m=>m.spp,v=>fmtN(v,1),true):''},
+otr:{n:'OTR',t:'OverTime Ratio — 오버타임 비율',
+  d:'계획 종료 시각을 넘겨 촬영한 시간이 정규 계획 시간(휴게 제외)에서 차지하는 비율. 스케줄 설계의 정확도와 현장 통제력을 함께 반영한다.',
+  f:'OTR = 계획 종료 초과 시간 ÷ (계획 집합~종료 − 휴게)',
+  zk:'otr',zs:[['10% 미만','양호','ok'],['10 ~ 20%','주의','warn'],['20% 초과','위험','risk']],
+  g:m=>m.otr,fmt:MXPCT,
+  note:'오버타임은 비용(BUR)과 다음 회차 컨디션에 이중으로 청구된다. 반복되면 원인이 계획(낙관적 스케줄)인지 실행(현장 지연)인지 구분 — WRP가 낮으면 계획 문제, WRP가 정상인데 OTR이 높으면 실행 문제.',
+  extra:c=>{
+    const rows=c.win.map(x=>({k:x.k,v:x.m.otr})).filter(r=>r.v!=null&&r.v>0).sort((a,b)=>b.v-a.v);
+    if(!rows.length) return '<h4 class="mxs">초과 발생 회차</h4><div class="hint">집계 창 내 오버타임 발생 없음.</div>';
+    return '<h4 class="mxs">초과 발생 회차</h4>'+mxRows(rows.map(r=>({l:r.k,r:MXPCT(r.v),cls:r.v>0.2?'rd':'or'})));
+  }},
+cta:{n:'CTA',t:'Call Time Accuracy — 콜 지연 (당일)',
+  d:'계획 콜타임 대비 실제 집합이 몇 분 늦었는지. 0 이하면 정시. 하루의 첫 단추 — 여기서 밀리면 전 일정이 뒤로 민다.',
+  f:'CTA = 실제 집합 시각 − 계획 콜타임 (분)',
+  zk:'cta',zs:[['0분 이하','정시','ok'],['1 ~ 10분','지연','warn'],['10분 초과','지연','risk']],
+  g:m=>m.callDelay,fmt:v=>v==null?'–':(v<=0?'정시':'+'+Math.round(v)+'분'),
+  note:'집합 지연의 원인은 대부분 전날 랩 시간이다. 전날 OTR과 붙여서 본다.',
+  extra:c=>{
+    if(!c.e) return '';
+    const rows=(c.e.cast||[]).filter(x=>x.planT&&x.tIn).map(x=>({name:x.name,d:toMin(x.tIn)-toMin(x.planT)})).sort((a,b)=>b.d-a.d);
+    if(!rows.length) return '';
+    return '<h4 class="mxs">배우별 콜 대비 진입</h4>'+mxRows(rows.map(r=>({l:r.name,r:r.d<=0?'정시':'+'+r.d+'분',cls:r.d>10?'rd':(r.d>0?'or':'gn')})));
+  }},
+ctapct:{n:'CTA',t:'Call Time Accuracy — 정시 시작률 (누적)',
+  d:'집계 창 안에서 계획 콜타임에 정시 집합한 회차의 비율. 제작 리듬의 규칙성을 보여주는 지표.',
+  f:'CTA = 정시 시작 회차 수 ÷ 콜 기록 회차 수',
+  zk:'ctaPct',zs:[['90% 이상','안정','ok'],['70 ~ 90%','정상','info'],['70% 미만','불안정','risk']],
+  cv:c=>c.pct(m=>m.onTime),g:m=>m.callDelay,fmt:v=>v==null?'–':fmtN(v,0)+'%',
+  note:'불안정이면 회차별 지연 분포를 본다 — 특정 요일·특정 장소·특정 유닛에 몰려 있으면 구조 문제, 고르게 퍼져 있으면 운영 문제.',
+  extra:c=>{
+    const rows=c.win.map(x=>({k:x.k,v:x.m.callDelay})).filter(r=>r.v!=null);
+    if(!rows.length) return '';
+    return '<h4 class="mxs">회차별 콜 지연</h4>'+mxRows(rows.map(r=>({l:r.k,r:r.v<=0?'정시':'+'+Math.round(r.v)+'분',cls:r.v>10?'rd':(r.v>0?'or':'gn')})));
+  }},
+wrp:{n:'WRP',t:'Wrap Prediction — 랩 예측 적중률',
+  d:'계획 종료 시각과 실제 종료의 차이가 ±30분 안에 든 회차의 비율. 콜시트가 얼마나 신뢰할 수 있는 문서인지를 수치화한 것.',
+  f:'WRP = |실제 종료 − 계획 종료| ≤ 30분인 회차 ÷ 기록 회차',
+  zk:'wrp',zs:[['90% 이상','정확','ok'],['70 ~ 90%','정상','info'],['70% 미만','부정확','risk']],
+  cv:c=>c.pct(m=>m.wrpOk),g:m=>m.wrpOk==null?null:(m.wrpOk?1:0),fmt:v=>v==null?'–':fmtN(v,0)+'%',
+  note:'WRP가 낮으면 스태프·배우가 콜시트를 믿지 않게 되고, 그 불신이 CTA 지연으로 되돌아온다. 예측 오차의 방향(항상 늦게 끝나는가, 들쭉날쭉인가)을 아래에서 확인.',
+  extra:c=>{
+    const rows=c.win.map(x=>{
+      const e=x.e, pe=e.plan&&e.plan.end, ae=e.actual&&e.actual.end;
+      if(!pe||!ae) return null;
+      return {k:x.k,d:toMin(ae)-toMin(pe)};
+    }).filter(Boolean);
+    if(!rows.length) return '';
+    return '<h4 class="mxs">회차별 종료 예측 오차</h4>'+mxRows(rows.map(r=>({
+      l:r.k,r:(r.d>0?'+':'')+r.d+'분',cls:Math.abs(r.d)<=30?'gn':(r.d>0?'rd':'cy')})));
+  }},
+c2w:{n:'콜투랩',t:'Call to Wrap — 실 구속 시간',
+  d:'집합부터 촬영 종료까지의 총 시간. 스태프·배우가 하루에 실제로 묶여 있는 시간으로, 주 52시간 운영(UUR)의 원자료.',
+  f:'콜투랩 = 실제 종료 − 실제 집합 (기록 없으면 첫 씬 시작~마지막 씬 종료)',
+  zs:null,g:m=>m.c2w,fmt:v=>fmtN(v)+'h',
+  note:'표준 12h 기준으로 판독. 콜투랩이 길어지는데 촬영시간 합이 그대로면 이동·대기·식사가 늘어난 것 — 순촬영 비율(촬영시간 합 ÷ 콜투랩)을 함께 본다.',
+  extra:c=>{
+    const rows=c.win.map(x=>({k:x.k,c2w:x.m.c2w,sh:x.m.shootH})).filter(r=>r.c2w!=null);
+    if(!rows.length) return '';
+    return '<h4 class="mxs">회차별 구속 시간 · 순촬영 비율</h4>'+mxRows(rows.slice(-8).map(r=>({
+      l:r.k,r:fmtN(r.c2w)+'h'+(r.sh?' · 순촬영 '+Math.round(r.sh/r.c2w*100)+'%':''),cls:r.c2w>13?'rd':undefined})));
+  }},
+shooth:{n:'촬영시간 합',t:'씬 단위 순촬영 시간 합계',
+  d:'씬별 시작~종료 시간의 합. 이동·대기·식사가 빠진 카메라가 실제로 돈 시간에 가깝다.',
+  f:'Σ (씬 종료 − 씬 시작)',
+  zs:null,g:m=>m.shootH,fmt:v=>fmtN(v)+'h',
+  note:'콜투랩 대비 이 값의 비율이 현장 효율의 실체다. 비율이 50% 아래면 하루의 절반이 촬영 외 시간.',
+  extra:c=>''},
+breaks:{n:'휴게 기록',t:'식사·중간 휴게',
+  d:'현장 탭에서 기록한 식사·휴게의 건수와 총 시간. OTR 산식의 정규 시간 계산에서 차감된다.',
+  f:'Σ (휴게 종료 − 휴게 시작)',
+  zs:null,g:m=>m.breaksH||null,fmt:v=>fmtN(v)+'h',
+  note:'휴게 미기록은 OTR을 실제보다 나쁘게 보이게 한다. 기록 습관의 문제인지 실제 휴게 부족인지 구분할 것.',
+  extra:c=>''},
+takes:{n:'테이크 총',t:'테이크 총수 · OK 수',
+  d:'테크트리로 기록된 전체 테이크 수와 그중 OK 수. TPS·NGR·OKR·FTC의 모수.',
+  f:'현장 탭 셋업별 테이크 기록의 합',
+  zs:null,g:m=>m.takes||null,fmt:v=>fmtN(v,0),
+  note:'테이크 기반 지표는 기록된 씬만 집계한다. 모수가 작을 때(테이크 30개 미만) 비율 지표는 과신하지 말 것.',
+  extra:c=>''},
+tps:{n:'TPS',t:'Takes Per Setup — 셋업당 테이크',
+  d:'셋업 하나를 끝내는 데 몇 테이크가 들었는지. 낮을수록 한 번에 가는 현장.',
+  f:'TPS = 테이크 총수 ÷ 기록 셋업 수',
+  zk:'tps',zs:[['2 미만','안정','ok'],['2 ~ 3.5','정상','info'],['3.5 초과','불안정','risk']],
+  g:m=>m.tps,fmt:v=>fmtN(v,2),
+  note:'불안정이면 NGR 분해(누가 NG를 내는가)로 내려간다. NGR이 낮은데 TPS만 높으면 NG 없이 여러 번 가는 것 — 연출 판단(OK 기준)의 문제일 수 있다.',
+  extra:c=>{
+    if(c.mode!=='day'||!c.e) return '';
+    const rows=[];
+    (c.e.scenes||[]).forEach(x=>{ if(x.shot!=='Y'||!x.rec) return;
+      x.rec.setups.forEach((su,si)=>{ const tk=(su.takes||[]).length; if(tk>=3) rows.push({l:'S '+x.no+' · 셋업'+(si+1)+' ('+(su.type||'미지정')+')',v:tk}); }); });
+    if(!rows.length) return '';
+    return '<h4 class="mxs">테이크 소모 상위 셋업 (3테이크 이상)</h4>'+mxRows(rows.sort((a,b)=>b.v-a.v).slice(0,8).map(r=>({l:r.l,r:r.v+'테이크',cls:r.v>=5?'rd':'or'})));
+  }},
+ngr:{n:'NGR',t:'NG Ratio — NG 비율',
+  d:'전체 테이크 중 NG가 차지하는 비율. 품질 계열의 중심 지표로, 5코드 분해(연기·디렉션·기술·외부·기타)로 책임 소재까지 내려갈 수 있다.',
+  f:'NGR = NG 테이크 ÷ 테이크 총수',
+  zk:'ngr',zs:[['15% 미만','양호','ok'],['15 ~ 30%','정상','info'],['30% 초과','위험','risk']],
+  g:m=>m.ngr,fmt:MXPCT,
+  note:'수치 자체보다 분포가 중요하다. 연기(01)에 몰리면 리허설·대본 전달, 디렉션(02)이면 콘티·커뮤니케이션, 기술(03)이면 장비·인력 점검. 외부(04)는 통제 불가 — 장소 선정에 반영.',
+  extra:c=>{
+    const ngAll=c.mode==='day'? (c.m?c.m.ngAll:{}) : (()=>{const o={};c.win.forEach(x=>Object.entries(x.m.ngAll||{}).forEach(([cd,n])=>o[cd]=(o[cd]||0)+n));return o;})();
+    const takes=c.mode==='day'? (c.m?c.m.takes:0) : c.win.reduce((a,x)=>a+(x.m.takes||0),0);
+    let h='<h4 class="mxs">NG 5코드 분해</h4>'+mxNgBreak(ngAll,takes);
+    if(c.mode==='day'&&c.e){
+      const sc=(c.e.scenes||[]).map(x=>{const st=recStats(x);return {no:x.no,ng:st.ngSum||0};}).filter(x=>x.ng>0).sort((a,b)=>b.ng-a.ng);
+      if(sc.length) h+='<h4 class="mxs">NG 다발 씬</h4>'+mxRows(sc.slice(0,6).map(x=>({l:'S '+x.no,r:x.ng+'건',cls:x.ng>=5?'rd':undefined})));
+    }
+    return h;
+  }},
+okr:{n:'OKR',t:'OK Ratio — OK 비율',
+  d:'전체 테이크 중 OK의 비율. NGR의 거울 지표지만, OK 판정 기준(연출 성향)이 개입된다는 점이 다르다.',
+  f:'OKR = OK 테이크 ÷ 테이크 총수',
+  zk:'okr',zs:[['80% 이상','안정','ok'],['60 ~ 80%','정상','info'],['60% 미만','불안정','risk']],
+  g:m=>m.okr,fmt:MXPCT,
+  note:'OKR + NGR이 100%에 못 미치면 판정 보류(킵) 테이크가 있다는 뜻. 킵이 많은 연출은 편집실에서 결정을 미루는 유형 — 후반 일정에 영향.',
+  extra:c=>''},
+ftc:{n:'FTC',t:'First Take Complete — 1테이크 완료율',
+  d:'셋업이 첫 테이크 OK로 끝난 비율. 배우·스태프·연출의 준비도가 한 숫자로 응축되는 지표.',
+  f:'FTC = 1테이크 OK 셋업 ÷ 기록 셋업 수',
+  zk:'ftc',zs:[['50% 초과','베테랑','ok'],['30 ~ 50%','정상','info'],['30% 미만','입문','warn']],
+  g:m=>m.ftc,fmt:MXPCT,
+  note:'FTC가 오르면 TPS·NGR·평균 셋업 시간이 함께 좋아진다 — 선행 지표로 쓸 것. 배우별 aFTC(역할별 섹션)로 내려가면 누구의 준비도가 끌어올리고 있는지 보인다.',
+  extra:c=>''},
+rtr:{n:'RTR',t:'ReTake Ratio — 재촬영 씬 비율',
+  d:'촬영 완료 후 재촬영 표시가 붙은 씬의 비율. 하루 안의 NG와 달리, 회차를 넘어 되돌아온 품질 비용이다.',
+  f:'RTR = 재촬영 표시 씬 ÷ 촬영 씬',
+  zk:'rtr',zs:[['2% 미만','양호','ok'],['2 ~ 5%','정상','info'],['5% 초과','위험','risk']],
+  g:m=>m.rtr,fmt:v=>v==null?'–':(v*100).toFixed(1)+'%',
+  note:'재촬영 1씬의 실비용은 그 씬 촬영비가 아니라 재소집 비용 전체다. 원인 유형(연결 오류·기술 결함·연출 변경)을 메모로 남겨 두면 R2 룰 엔진에서 쓸 수 있다.',
+  extra:c=>{
+    if(c.mode!=='day'||!c.e) return '';
+    const rows=(c.e.scenes||[]).filter(x=>x.retake).map(x=>({l:'S '+x.no,r:(x.loc||'')+''}));
+    return rows.length? '<h4 class="mxs">재촬영 표시 씬</h4>'+mxRows(rows):'';
+  }},
+ngsum:{n:'NG 총 / 씬당',t:'NG 총량과 씬당 평균',
+  d:'회차의 NG 총 건수와, 촬영 씬 하나당 평균 NG 수. NGR(테이크 대비)과 달리 절대량을 본다.',
+  f:'씬당 NG = NG 총수 ÷ 촬영 씬 수',
+  zs:null,g:m=>m.ngSum||null,fmt:v=>fmtN(v,0)+'건',
+  note:'테이크 기록이 없는 구버전 회차와 비교할 때는 이 절대량 지표가 유일한 공통 척도다.',
+  extra:c=>''},
+scenes:{n:'씬 촬영/미촬영',t:'계획 대비 소화 씬',
+  d:'이 회차에 배정된 씬 중 촬영 완료(Y)와 미촬영(N)의 수. 미촬영 씬은 잔여 스케줄로 이월된다.',
+  f:'기초 탭 씬 목록의 촬영 여부 집계',
+  zs:null,g:m=>m.scenesY||null,fmt:v=>fmtN(v,0)+'씬',
+  note:'미촬영이 반복되는 씬(장소·배우 조건이 까다로운 씬)은 스케줄 후반의 폭탄이 된다. 이월 이력을 기초 탭에서 추적할 것.',
+  extra:c=>''},
+sdi:{n:'SDI',t:'Script Difficulty Index — 대본 난이도 지수',
+  d:'씬 성격(대사 1.0 · 감정 1.3 · 군중 1.5 · 액션 1.8 · 인서트 0.7)에 야간 가중(×1.1)을 얹어 페이지로 가중 평균한 값. 1.00 = 표준 대사씬 하루.',
+  f:'SDI = Σ(씬 페이지 × 씬 가중치) ÷ Σ 씬 페이지',
+  zs:null,g:m=>m.sdi,fmt:v=>fmtN(v,2),
+  note:'DPP를 SDI 없이 회차끼리 비교하는 것은 평지와 오르막의 속도를 그대로 비교하는 것과 같다. 회차 간 산출량 비교는 반드시 DPP-adj로.',
+  extra:c=>{
+    if(c.mode!=='day'||!c.m) return '';
+    const ks=Object.entries(c.m.byKind||{});
+    if(!ks.length) return '';
+    return '<h4 class="mxs">씬 성격 구성 (촬영분)</h4>'+mxRows(ks.sort((a,b)=>b[1].pg-a[1].pg).map(([k,b])=>({l:(KINDN[k]||k)+' · '+b.scenes+'씬',r:fmtN(b.pg)+'p'})));
+  }},
+dppadj:{n:'DPP-adj',t:'난이도 보정 산출량',
+  d:'DPP에 SDI를 곱해 대본 난이도를 감안한 실질 산출량. 액션 회차의 5p와 대사 회차의 7p를 같은 저울에 올린다.',
+  f:'DPP-adj = DPP × SDI',
+  zs:null,g:m=>m.dppAdj,fmt:MXP1,
+  note:'회차 간·유닛 간 산출량 비교의 기준값. 미분류 씬이 많으면 SDI가 1.0 쪽으로 뭉개지므로 분류 완료율부터 확인.',
+  extra:c=>''},
+kind:{n:'분류 완료',t:'씬 성격 분류 진행',
+  d:'전체 씬 중 성격(대사·감정·액션·군중·인서트·기타)이 지정된 씬의 수. SDI·유형별 효율의 정확도를 좌우한다.',
+  f:'기초 탭에서 씬별 지정 (자동 제안 후 확인)',
+  zs:null,g:null,fmt:v=>v,
+  note:'임포트 직후 자동 제안이 붙지만 확인 전까지는 미분류다. 촬영 전 기초 탭에서 일괄 확인하는 습관을 권장.',
+  extra:c=>''},
+sdibase:{n:'SDI 기준',t:'가중치 기준점',
+  d:'SDI 1.00은 표준 대사씬으로만 채워진 하루를 뜻한다. 모든 가중치는 이 기준의 상대값이다.',
+  f:'대사 1.0 · 인서트 0.7 · 감정 1.3 · 군중 1.5 · 액션 1.8 · 야간 ×1.1',
+  zs:null,g:null,fmt:v=>v,
+  note:'가중치는 씬분류·작품지표 기준 v0.1의 가설값 — 누적 데이터로 백테스트 후 보정 예정.',
+  extra:c=>''},
+dngr:{n:'dNGR',t:'연출 디렉션 NG율',
+  d:'전체 테이크 중 디렉션 NG(코드 02)의 비율. 연출 파트가 유발한 재촬영 부담.',
+  f:'dNGR = NG(02) ÷ 테이크 총수',
+  zs:null,g:m=>m.dNGR,fmt:MXPCT,
+  note:'개인 지표 계열 — 거버넌스 6원칙(본인 열람 우선·외부 공개 금지) 적용 대상. 콘티 준비도·현장 수정 빈도와 함께 해석할 것.',
+  extra:c=>''},
+pace:{n:'씬당 소요',t:'연출 씬 소화 속도',
+  d:'순촬영 시간을 촬영 씬 수로 나눈 값. 연출의 현장 템포를 보여준다.',
+  f:'씬당 소요 = 촬영시간 합 ÷ 촬영 씬 수',
+  zs:null,g:m=>m.scenePace,fmt:v=>fmtN(v)+'h',
+  note:'씬 성격 구성에 크게 좌우된다 — 유형별 효율 표(R1b)와 함께 볼 것.',
+  extra:c=>''},
+tngr:{n:'tNGR',t:'스태프 기술 NG율',
+  d:'전체 테이크 중 기술 NG(코드 03 — 포커스·붐·조명 등)의 비율.',
+  f:'tNGR = NG(03) ÷ 테이크 총수',
+  zs:null,g:m=>m.tNGR3,fmt:MXPCT,
+  note:'특정 샷 종류(무빙·클로즈업)에 몰리는지 샷 종류별 셋업 표와 교차 확인. 장비 문제인지 인력 문제인지가 갈린다.',
+  extra:c=>''},
+sst:{n:'SST',t:'Setup Standing Time — 평균 셋업 시간',
+  d:'셋업 하나를 준비~완료하는 데 걸린 평균 시간(분). 촬영·조명팀 효율의 직접 지표.',
+  f:'SST = Σ 셋업 소요(분) ÷ 측정 셋업 수',
+  zs:null,g:m=>m.suAvgMin,fmt:v=>fmtN(v,0)+'분',
+  note:'평균만 보지 말고 병목(평균 1.5배 초과 셋업)의 유형을 볼 것 — 특정 샷 종류·특정 장소에 몰려 있으면 대응이 가능하다.',
+  extra:c=>''},
+suavg:{n:'평균 셋업 시간',t:'셋업 전환 평균 (분)',
+  d:'측정된 셋업들의 평균 소요 시간. 사이클 컴퓨터의 평균 케이던스에 해당하는 현장 회전 지표.',
+  f:'Σ 셋업 소요(분) ÷ 측정 셋업 수',
+  zs:null,g:m=>m.suAvgMin,fmt:v=>fmtN(v,0)+'분',
+  note:'짧을수록 좋은 게 아니라 일정할수록 좋다 — 최장 셋업과의 격차가 크면 특정 병목이 하루를 흔들고 있는 것.',
+  extra:c=>{
+    const rows=c.mode==='day'? (c.e?setupRows(c.e,''):[]) : (()=>{let r=[];c.win.forEach(x=>{r=r.concat(setupRows(x.e,x.k));});return r;})();
+    if(!rows.length) return '';
+    const avg=rows.reduce((a,r)=>a+r.min,0)/rows.length;
+    const top=rows.sort((a,b)=>b.min-a.min).slice(0,6);
+    return '<h4 class="mxs">병목 셋업 상위</h4>'+mxRows(top.map(r=>({
+      l:(r.ep?r.ep+' · ':'')+'S '+r.sc+' · 셋업'+r.si+' ('+r.ty+')',r:r.min+'분 · '+r.tk+'테이크',cls:r.min>avg*1.5?'rd':undefined})));
+  }},
+sumax:{n:'최장 셋업',t:'하루 최대 병목',
+  d:'측정 셋업 중 가장 오래 걸린 것의 소요 시간. 하루 리듬을 끊은 지점.',
+  f:'max(셋업 소요)',
+  zs:null,g:m=>m.suMaxMin,fmt:v=>fmtN(v,0)+'분',
+  note:'최장 셋업의 유형이 반복되면(예: 무빙샷마다 40분) 장비·인력 구성의 구조 신호다.',
+  extra:c=>MX.suavg.extra(c)},
+sun:{n:'측정 셋업',t:'시간 기록 커버리지',
+  d:'시작·종료 시각이 기록되어 시간 측정이 가능한 셋업 수 / 전체 셋업 수. 셋업 시간 지표들의 신뢰도.',
+  f:'라이브 기록에서 t0·t1이 모두 있는 셋업',
+  zs:null,g:null,fmt:v=>v,
+  note:'커버리지가 절반 아래면 평균·최장 값은 참고치로만 볼 것.',
+  extra:c=>''},
+suph:{n:'시간당 셋업',t:'셋업 회전율',
+  d:'한 시간에 몇 개의 셋업을 소화하는지. 60 ÷ 평균 셋업 시간.',
+  f:'60 ÷ 평균 셋업 시간(분)',
+  zs:null,g:m=>m.suAvgMin?60/m.suAvgMin:null,fmt:v=>fmtN(v,1),
+  note:'SPD(회당 셋업)와 함께 보면 하루 중 실제 회전 가동 시간이 역산된다.',
+  extra:c=>''},
+btl:{n:'당일 BTL 합',t:'Below The Line 당일 집행',
+  d:'9항목(출연료·단역무술·보조출연·차량·특수장비·장소·미술·숙박·기타)의 당일 합계. 입력값이 없으면 임포트 참고값 사용.',
+  f:'Σ 9항목 (체크 탭 입력 ?? 사전제작일지 참고값)',
+  zs:null,g:null,fmt:v=>v==null?'–':Math.round(v/10000).toLocaleString()+'만원',
+  cv:c=>{const t=c.mode==='day'&&c.e? costTotal(c.e):null;return t;},
+  note:'BUR의 모수다. 미입력 항목이 많으면 BUR이 실제보다 좋게 보인다 — 비용 입력 타일에서 커버리지 확인.',
+  extra:c=>{
+    if(c.mode!=='day'||!c.e) return '';
+    const p=costPrefill(c.e);
+    const rows=COSTS9.map(([k,nm])=>{const v=c.e.costs[k]!=null?c.e.costs[k]:p[k];return v>0?{l:nm+(c.e.costs[k]!=null?'':' (참고값)'),r:Math.round(v/10000).toLocaleString()+'만원'}:null;}).filter(Boolean);
+    return rows.length? '<h4 class="mxs">항목별 구성</h4>'+mxRows(rows):'';
+  }},
+bur:{n:'BUR',t:'Budget Usage Rate — 예산 편차',
+  d:'당일 BTL 집행이 회당 표준 BTL의 균등 배분선에서 얼마나 벗어났는지(%p). 음수면 절감, 양수면 초과.',
+  f:'BUR = (당일 BTL ÷ 회당 표준 BTL − 1 ÷ 회차 수) × 100',
+  zk:'bur',zs:[['−5%p 미만','절감','ok'],['−5 ~ +5%p','정상','info'],['+5 ~ +10%p','주의','warn'],['+10%p 초과','초과','risk']],
+  g:m=>m.bur,fmt:v=>v==null?'–':(v>0?'+':'')+fmtN(v)+'%p',
+  note:'절감이 항상 좋은 건 아니다 — 보조출연·장비를 줄여 만든 절감이면 화면 밀도로 청구서가 온다. OTR과 함께 볼 것: 오버타임 수당은 이 지표의 지연 폭탄이다.',
+  extra:c=>{
+    if(c.mode==='day') return MX.btl.extra(c);
+    const rows=c.win.map(x=>({k:x.k,v:x.m.bur})).filter(r=>r.v!=null);
+    if(!rows.length) return '';
+    return '<h4 class="mxs">회차별 편차</h4>'+mxRows(rows.map(r=>({l:r.k,r:(r.v>0?'+':'')+fmtN(r.v)+'%p',cls:r.v>10?'rd':(r.v>5?'or':(r.v<-5?'gn':undefined))})));
+  }},
+stdbtl:{n:'회당 BTL 표준',t:'예산 기준선',
+  d:'작품 설정에 입력된 회당 표준 BTL. BUR 판정의 분모.',
+  f:'작품 설정 → 회당 BTL',
+  zs:null,g:null,fmt:v=>v,
+  note:'표준값이 실제 계약 구조와 다르면 BUR 전체가 흔들린다. 개편 시 반드시 갱신.',
+  extra:c=>''},
+costin:{n:'비용 입력',t:'9항목 입력 커버리지',
+  d:'9항목 중 당일 실제 입력이 된 항목 수. BUR·BTL 합의 신뢰도 지표.',
+  f:'체크 탭 비용 입력 항목 수',
+  zs:null,g:null,fmt:v=>v,
+  note:'입력이 3항목 아래면 BUR은 판정 보류로 취급할 것.',
+  extra:c=>''},
+sri:{n:'SRI',t:'Shooting Risk Index — 촬영 리스크 지수 (근사·가설)',
+  d:'누적 DPP·SPI·OTR·NGR의 악화 신호를 합성한 조기 경보 지수. 기본 0.30에서 조건별 가중을 더해 0.95를 상한으로 한다. 백테스트 전 가설 가중치.',
+  f:'0.30 + SPI악화(+0.15/+0.15) + OTR악화(+0.10/+0.15) + DPP<5(+0.10) + NGR>30%(+0.10)',
+  zk:'sri',zs:[['0.40 미만','GREEN','ok'],['0.40 ~ 0.60','YELLOW','info'],['0.60 ~ 0.80','AMBER','warn'],['0.80 이상','RED','risk']],
+  cv:c=>sriApprox(c.avg(m=>m.dpp),c.avg(m=>m.spi),c.avg(m=>m.otr),c.avg(m=>m.ngr)),
+  g:null,fmt:v=>fmtN(v,2),
+  note:'단일 수치보다 어떤 조건이 점수를 밀어올렸는지가 처방이다. 아래 분해에서 발화한 조건을 확인하고 해당 지표 타일로 이동.',
+  extra:c=>{
+    const dpp=c.avg(m=>m.dpp),spi=c.avg(m=>m.spi),otr=c.avg(m=>m.otr),ngr=c.avg(m=>m.ngr);
+    const items=[{l:'기본값',r:'+0.30',on:true}];
+    items.push({l:'SPI '+(spi==null?'기록 없음':fmtN(spi,2))+' — 0.95 미만',r:'+0.15',on:spi!=null&&spi<0.95});
+    items.push({l:'SPI — 0.85 미만 (심화)',r:'+0.15',on:spi!=null&&spi<0.85});
+    items.push({l:'OTR '+(otr==null?'기록 없음':MXPCT(otr))+' — 10% 초과',r:'+0.10',on:otr!=null&&otr>0.10});
+    items.push({l:'OTR — 20% 초과 (심화)',r:'+0.15',on:otr!=null&&otr>0.20});
+    items.push({l:'DPP '+(dpp==null?'기록 없음':MXP1(dpp))+' — 5p 미만',r:'+0.10',on:dpp!=null&&dpp<5});
+    items.push({l:'NGR '+(ngr==null?'기록 없음':MXPCT(ngr))+' — 30% 초과',r:'+0.10',on:ngr!=null&&ngr>0.30});
+    return '<h4 class="mxs">점수 분해 — 발화 조건</h4>'+items.map(x=>
+      `<div class="mxz ${x.on?'cur':''}" style="${x.on?'':'opacity:.45'}"><span>${x.l}</span><span class="pill ${x.on?(x.l==='기본값'?'dim':'risk'):'dim'}">${x.on?x.r:'미발화'}</span></div>`).join('')
+      +'<div class="hint" style="margin-top:6px">발화한 조건의 지표 타일에서 원인 분해를 이어서 볼 것. 가중치는 누적 10회차 백테스트 후 보정 예정(R2).</div>';
+  }},
+ngavg:{n:'NG/회',t:'회당 평균 NG 건수',
+  d:'집계 창 안에서 회차당 평균 NG 건수(절대량). 테이크 기록이 없는 회차까지 포함하는 공통 척도.',
+  f:'Σ NG 건수 ÷ 집계 회차',
+  zs:null,g:m=>m.ngSum||null,fmt:v=>fmtN(v)+'건',
+  note:'NGR(비율)과 방향이 다르면 — 건수는 늘었는데 비율은 그대로 — 촬영량 자체가 늘어난 것이므로 나쁜 신호가 아니다.',
+  extra:c=>{
+    const o={};c.win.forEach(x=>Object.entries(x.m.ngAll||{}).forEach(([cd,n])=>o[cd]=(o[cd]||0)+n));
+    return '<h4 class="mxs">NG 5코드 분해 (집계 창 합산)</h4>'+mxNgBreak(o,c.win.reduce((a,x)=>a+(x.m.takes||0),0));
+  }},
+totpg:{n:'누적 페이지',t:'집계 창 촬영 페이지 합',
+  d:'집계 창 안에서 촬영 완료한 페이지의 합. 진행률(PGR)의 재료.',
+  f:'Σ 회차 촬영 페이지',
+  zs:null,g:m=>m.pgShot||null,fmt:MXP1,
+  note:'완성 예측(R1c)은 전체 누적 기준으로 따로 계산된다 — 이 값은 창 안의 합.',
+  extra:c=>''},
+winw:{n:'집계 창',t:'누적 지표의 계산 범위',
+  d:'누적 화면의 모든 평균·비율이 계산되는 회차 범위. 최근 4회 = 단기 컨디션, 최근 8회 = 중기 추세, 전체 = 작품 기준선.',
+  f:'상단 [최근 4회 | 최근 8회 | 전체] 선택',
+  zs:null,g:null,fmt:v=>v,
+  note:'같은 지표가 창에 따라 다른 판정을 받으면 — 4회는 위험, 전체는 정상 — 최근에 문제가 시작됐다는 신호다. 창을 바꿔가며 보는 것 자체가 분석이다.',
+  extra:c=>''},
+reccnt:{n:'기록 회차',t:'현장 기록 커버리지',
+  d:'전체 회차 중 현장 기록(촬영 완료 씬 또는 라이브 기록)이 있는 회차 수. 누적 지표의 모수.',
+  f:'기록 회차 ÷ 전체 회차',
+  zs:null,g:null,fmt:v=>v,
+  note:'기록 없는 회차는 평균에서 제외된다 — 커버리지가 낮으면 누적 지표는 기록한 날만의 이야기다.',
+  extra:c=>''},
+pgr:{n:'PGR',t:'Pages Grinded Ratio — 진행률',
+  d:'대본 총 페이지 중 촬영 완료한 비율. 완성 예측(R1c)의 현재 위치.',
+  f:'PGR = 누적 촬영 페이지 ÷ 대본 총 페이지',
+  zs:null,g:null,fmt:v=>v==null?'–':(v*100).toFixed(1)+'%',
+  cv:c=>{const s=DB.settings;if(!(s.totalPages>0))return null;return c.all.reduce((a,x)=>a+(x.m.pgShot||0),0)/s.totalPages;},
+  note:'진행률의 기울기(최근 4회 DPP)가 곧 예상 크랭크업이다. 아래 3시나리오의 폭이 좁아질수록 예측이 익은 것.',
+  extra:c=>''},
+shotall:{n:'촬영 완료',t:'누적 촬영 페이지 (전체)',
+  d:'작품 전체에서 촬영 완료한 페이지 합계.',
+  f:'Σ 전 회차 촬영 페이지',
+  zs:null,g:m=>m.pgShot||null,fmt:MXP1,
+  note:'실제 페이지 입력이 안 된 회차는 계획 페이지로 잡힌다 — 결산 정확도를 위해 실제 페이지 확정 습관을 권장.',
+  extra:c=>''},
+remain:{n:'잔여 분량',t:'남은 대본 페이지',
+  d:'대본 총 페이지에서 누적 촬영분을 뺀 값.',
+  f:'잔여 = 총 페이지 − 누적 촬영 페이지',
+  zs:null,g:null,fmt:v=>v,
+  note:'잔여 분량의 씬 성격 구성(액션·군중 비중)이 후반일수록 무거우면 단순 나눗셈 예측은 낙관이 된다.',
+  extra:c=>''},
+fac:{n:'촬영일 간격',t:'달력 환산 계수',
+  d:'촬영일 사이의 실측 평균 간격(일). 잔여 촬영일을 달력 날짜로 바꾸는 계수.',
+  f:'(마지막 촬영일 − 첫 촬영일) ÷ (촬영 회차 − 1)',
+  zs:null,g:null,fmt:v=>v,
+  note:'휴차·이동일이 늘면 이 계수가 커져 크랭크업이 뒤로 민다. DPP가 그대로여도 크랭크업이 밀리는 이유가 여기 있다.',
+  extra:c=>''}
+};
+
+let MXKEY=null;
+function openMx(key){
+  const info=MX[key]; if(!info) return;
+  MXKEY=key;
+  const c=mxCtx();
+  /* 현재 값 */
+  const hasVal=!!(info.cv||info.g);
+  let v=null;
+  if(info.cv) v=info.cv(c);
+  else if(info.g) v=c.mode==='day'? (c.m?info.g(c.m):null) : c.avg(info.g);
+  const zone=(info.zk&&ZONES[info.zk])? ZONES[info.zk](v) : null;
+  const zpill=zone? `<span class="pill ${zone[1]}" style="font-size:12px">${zone[0]}</span>`:'';
+  const disp=hasVal? (info.fmt? info.fmt(v):(v==null?'–':v)) : '';
+  const scope=c.mode==='day'? '당일 · '+(CUR||'') : '누적 · '+(CUMW===0?'전체':'최근 '+CUMW+'회')+' 평균';
+  /* 판정 근거 */
+  let why='';
+  if(hasVal&&v==null) why='기록이 부족해 산출할 수 없는 상태. 관련 입력(현장 기록·시간·비용)이 쌓이면 자동 산출된다.';
+  else if(zone&&info.zs){ const z=info.zs.find(x=>x[1]===zone[0]); why=`현재 값 ${disp} → ${z?z[0]+' 구간':''} = <b>${zone[0]}</b> 판정.`; }
+  const trend=(info.g&&v!=null)? mxTrend(c,info.g,info.fmt||(x=>fmtN(x))):'';
+  const extra=info.extra? info.extra(c):'';
+  document.getElementById('mxbody').innerHTML=`
+    <div class="mxclose" onclick="closeMx()">✕</div>
+    <div class="mxhd"><span class="nm">${info.n}</span>${zpill}${disp!==''?`<span class="vv">${disp}</span>`:''}</div>
+    <div class="mxfull">${info.t} · ${scope}</div>
+    <h4 class="mxs">정의</h4><div class="mxdef">${info.d}</div>
+    <h4 class="mxs">산식</h4><div class="mxfor">${info.f}</div>
+    ${mxZones(info.zs, zone?zone[0]:null)}
+    ${why?'<h4 class="mxs">판정</h4><div class="mxdef">'+why+'</div>':''}
+    ${trend}
+    ${extra}
+    ${info.note?'<h4 class="mxs">읽는 법</h4><div class="mxwhy">'+info.note+'</div>':''}`;
+  document.getElementById('mxov').classList.add('on');
+  const sh=document.getElementById('mxsheet');
+  sh.scrollTop=0; sh.classList.add('on');
+}
+function closeMx(){
+  document.getElementById('mxov').classList.remove('on');
+  document.getElementById('mxsheet').classList.remove('on');
+  MXKEY=null;
+}
+document.body.insertAdjacentHTML('beforeend',
+  '<div id="mxov" onclick="closeMx()"></div><div id="mxsheet"><div id="mxgrip"></div><div id="mxbody"></div></div>');
 
 /* ---------- 합계 바 ---------- */
 function renderTotals(){
@@ -1738,9 +2262,6 @@ function exportXlsx(){
 }
 
 renderHome();
-if('serviceWorker' in navigator && location.protocol.startsWith('http')){
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
-}
 </script>
 </body>
 </html>
