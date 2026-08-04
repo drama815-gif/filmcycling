@@ -1,13 +1,20 @@
 {
   "name": "FilmCycling Computer",
   "short_name": "FilmCycling",
+  "description": "촬영 현장 기록·결산 — 드라마 제작 효율 지표",
+  "lang": "ko",
+  "dir": "ltr",
   "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
   "orientation": "any",
   "background_color": "#0C1016",
   "theme_color": "#0C1016",
   "start_url": "./index.html",
+  "scope": "./",
   "icons": [
-    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
   ]
 }

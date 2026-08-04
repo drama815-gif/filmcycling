@@ -6,7 +6,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0C1016">
-<title>FilmCycling Computer v0.9.2</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="FilmCycling">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+<title>FilmCycling Computer v0.9.3</title>
 <style>
   :root{
     --bg:#0C1016; --panel:#151B24; --panel2:#1A222D; --line:#232B37; --ink:#F2F5F8; --sub:#7C8794;
@@ -170,6 +177,43 @@
   #entry .scr .nums .u{font-size:7px;color:var(--sub);letter-spacing:.1em;}
   #entry .scr .tap{font-size:10.5px;font-weight:800;color:var(--ye);}
   input[type=file]{display:none;}
+  /* ══ v0.9.3 — 안드로이드 대응 ══════════════════════════════════════════
+     ① 뷰포트 높이: 안드로이드 크롬 주소창 접힘으로 100%가 흔들리는 문제 → dvh
+     ② 안전영역: 제스처 내비게이션 바가 하단 합계 바를 덮는 문제 → env() 패딩
+     ③ 좁은 폭(≤430px) 폰 대응: 타일·탭·합계 바 축소                       */
+  @supports (height:100dvh){ html,body{height:100dvh;} }
+  .wrap{padding-bottom:calc(70px + env(safe-area-inset-bottom));}
+  .totbar{padding-bottom:calc(10px + env(safe-area-inset-bottom));}
+  .body{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
+  .statbar{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));}
+  input,textarea,select,button{font-family:inherit;}
+  select{background-color:var(--panel2);}          /* 안드로이드 기본 흰 배경 방지 */
+  input[type=time],input[type=date]{min-height:34px;}/* 안드로이드 네이티브 피커 높이 확보 */
+
+  @media (max-width:430px){
+    .body{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));}
+    .titlebar{padding:10px 12px 5px;gap:9px;}
+    .titlebar h1{font-size:17px;}
+    .titlebar .sub{font-size:11px;}
+    .tab{font-size:14px;padding:10px 0;}
+    .fgrid{gap:6px;}
+    .field{padding:9px 10px 10px;border-radius:11px;}
+    .field .lbl{font-size:11px;}
+    .field .num{font-size:23px;}
+    .field .num small{font-size:11.5px;}
+    .grid3{grid-template-columns:1fr 1fr;}
+    .liverow{grid-template-columns:1fr 1fr;}
+    .totbar{gap:9px 14px;font-size:11.5px;padding-left:12px;padding-right:12px;}
+    .totbar b{font-size:14px;}
+    .epcard{padding:11px 12px;gap:9px;}
+    .epcard .no{width:46px;font-size:15px;}
+    .stepper button{width:34px;}
+    .mxhd .nm{font-size:16px;}
+    .mxhd .vv{font-size:23px;}
+    .scene .loc{font-size:12.5px;}
+    .doneRow{grid-template-columns:1fr;}   /* 실제 페이지 / 재촬영·기록재개 버튼 세로 분리 */
+    .doneRow .btn{padding:10px 4px;}
+  }
 </style>
 </head>
 <body>
@@ -179,7 +223,7 @@
   <div id="entryTiles"></div>
   <div style="position:absolute;top:6%;width:100%;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35);z-index:2">
     <div style="font-size:clamp(24px,4.5vw,40px);font-weight:900">FilmCycling Computer</div>
-    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.9.2 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
+    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.9.3 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
   </div>
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;z-index:1">
     <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" style="width:min(980px,100%);display:block">
@@ -302,7 +346,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </script>
 <script>
 /* ============================================================
-   FilmCycling Computer 앱 v0.9.2 — 종합지수·자동 기록·원터치·위치 유형·이동 전환 · 회차 관리(이름 변경·삭제)
+   FilmCycling Computer 앱 v0.9.3 — 안드로이드(PWA) 대응 · 종합지수·자동 기록·원터치·위치 유형·이동 전환 · 회차 관리(이름 변경·삭제)
    ============================================================ */
 const LS_KEY='fcc_app_v01'; /* v0.1 데이터와 호환 유지 */
 
@@ -931,7 +975,7 @@ function sceneCard(i){
       </span></div>
     <div class="desc">${esc(x.cast)}</div>`;
   /* 페이지 — 기초 설정값이 그대로 연결. 현장 변경분 즉시 반영 */
-  const pageRow=`<div class="grid2" style="margin-top:8px;align-items:end">
+  const pageRow=`<div class="grid2 doneRow" style="margin-top:8px;align-items:end">
     <div><label class="f">페이지 — 기초 설정 ${pg8(x.pages)}p 연결 (변경 시 수정)</label>
       <input type="number" inputmode="decimal" step="0.1" min="0" value="${pEff||''}" placeholder="0.0" onchange="pgAset(${i},this.value)"></div>
     <div class="hint" style="padding-bottom:8px">결산에 즉시 반영</div>
@@ -1013,7 +1057,7 @@ function sceneCard(i){
       body=timeRow+`
       <div style="background:var(--panel2);border-radius:10px;padding:10px 12px;margin-top:8px">
         <div style="font-size:12px;font-weight:800">완료 — 셋업 ${st.setups} · 테이크 ${st.takes??'–'} · OK ${st.ok??'–'} · NG <span style="color:${st.ngSum>0?'var(--rd)':'inherit'}">${st.ngSum}</span></div>
-        <div class="grid2" style="margin-top:8px;align-items:end">
+        <div class="grid2 doneRow" style="margin-top:8px;align-items:end">
           <div><label class="f">실제 페이지 — 기본=계획</label>
             <input type="number" inputmode="decimal" step="0.1" min="0" value="${pA||''}" placeholder="0.0" onchange="pgAset(${i},this.value)"></div>
           <div style="display:flex;gap:8px">
@@ -2627,6 +2671,16 @@ function exportXlsx(){
 }
 
 renderHome();
+</script>
+<script>
+/* ══ v0.9.3 — PWA 등록 (안드로이드 홈 화면 설치·오프라인 구동의 필수 조건) ══
+   iOS는 apple-mobile-web-app-capable 메타만으로 전체화면이 되지만,
+   안드로이드 크롬은 manifest + 서비스워커가 있어야 앱으로 설치된다.        */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(){});
+  });
+}
 </script>
 </body>
 </html>
