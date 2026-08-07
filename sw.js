@@ -1,6 +1,6 @@
-/* FilmCycling Computer — Service Worker v0.9.3
+/* FilmCycling Computer — Service Worker v0.10
    CACHE 문자열이 갱신 신호. 새 버전 배포 시 반드시 이 값을 함께 올릴 것. */
-const CACHE='fcc-v0.9.3';
+const CACHE='fcc-v0.10';
 const ASSETS=['./','./index.html','./manifest.webmanifest',
               './icon-180.png','./icon-192.png','./icon-512.png','./icon-maskable-512.png'];
 

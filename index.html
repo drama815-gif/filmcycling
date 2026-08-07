@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
-<title>FilmCycling Computer v0.9.3</title>
+<title>FilmCycling Computer v0.10</title>
 <style>
   :root{
     --bg:#0C1016; --panel:#151B24; --panel2:#1A222D; --line:#232B37; --ink:#F2F5F8; --sub:#7C8794;
@@ -223,7 +223,7 @@
   <div id="entryTiles"></div>
   <div style="position:absolute;top:6%;width:100%;text-align:center;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.35);z-index:2">
     <div style="font-size:clamp(24px,4.5vw,40px);font-weight:900">FilmCycling Computer</div>
-    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.9.3 — 기초 · 현장 기록 · 결산 · 컴퓨터를 탭하면 시작합니다</div>
+    <div style="font-size:clamp(11px,1.6vw,14px);font-weight:600;opacity:.92;margin-top:6px">v0.10 — 추이·컷라인 · 배우 비교 · 당일 예상 · 컴퓨터를 탭하면 시작합니다</div>
   </div>
   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;z-index:1">
     <svg viewBox="0 0 980 560" xmlns="http://www.w3.org/2000/svg" style="width:min(980px,100%);display:block">
@@ -277,6 +277,10 @@
     <div class="body">
       <h3 class="sec">작품 요약</h3>
       <div class="fgrid" id="homeSummary"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn" style="flex:1;border-color:var(--cy);color:var(--cy)" onclick="go('trend')">추이 — 라운드 · 컷라인</button>
+        <button class="btn" style="flex:1;border-color:var(--or);color:var(--or)" onclick="go('actors')">배우 비교</button>
+      </div>
       <h3 class="sec" style="display:flex;align-items:center">회차
         <button class="btn" id="epMgmtBtn" style="margin-left:auto;padding:6px 14px;font-size:12px" onclick="epMgmt()">관리</button></h3>
       <div id="epList"></div>
@@ -293,6 +297,24 @@
   <div class="wrap">
     <div class="titlebar"><span class="back" onclick="go('home')">◀ 홈</span><h1>작품 설정</h1></div>
     <div class="body" id="setBody"></div>
+  </div>
+</div>
+
+<!-- 추이 — 라운드·컷라인 (v0.10) -->
+<div class="view" id="trend">
+  <div class="statbar"><span class="logo">FILMCYCLING</span><span>추이 — 라운드 · 컷라인</span></div>
+  <div class="wrap">
+    <div class="titlebar"><span class="back" onclick="go('home')">◀ 홈</span><h1>추이 — 라운드 · 컷라인</h1></div>
+    <div class="body" id="trendBody"></div>
+  </div>
+</div>
+
+<!-- 배우 비교 (v0.10) -->
+<div class="view" id="actors">
+  <div class="statbar"><span class="logo">FILMCYCLING</span><span>배우 비교</span></div>
+  <div class="wrap">
+    <div class="titlebar"><span class="back" onclick="go('home')">◀ 홈</span><h1>배우 비교 — ATO · aTkG</h1></div>
+    <div class="body" id="actorsBody"></div>
   </div>
 </div>
 
@@ -346,7 +368,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </script>
 <script>
 /* ============================================================
-   FilmCycling Computer 앱 v0.9.3 — 안드로이드(PWA) 대응 · 종합지수·자동 기록·원터치·위치 유형·이동 전환 · 회차 관리(이름 변경·삭제)
+   FilmCycling Computer 앱 v0.10 — 검토안 v0.3 구현: 추이(이원 컷라인·팀 컷·라운드·ECD) · 배우 비교(ATO·aTkG·산점도) · LT 유형 지문 · 당일 예상
+   (v0.9.3 기반 — 안드로이드(PWA) 대응 · 종합지수·자동 기록·원터치·위치 유형·이동 전환 · 회차 관리)
    ============================================================ */
 const LS_KEY='fcc_app_v01'; /* v0.1 데이터와 호환 유지 */
 
@@ -404,6 +427,8 @@ function go(id){
   document.getElementById(id).classList.add('on');
   if(id==='home') renderHome();
   if(id==='setv') renderSet();
+  if(id==='trend') renderTrend();
+  if(id==='actors') renderActors();
 }
 
 /* ---------- 유틸 ---------- */
@@ -909,6 +934,7 @@ function renderBase(e){
         <button onclick="stpRest(-1)">−</button><span class="val" id="restV">${e.plan.rest??1}</span><button onclick="stpRest(1)">＋</button></div></div>
     </div>
     ${e.callRaw? '<div class="hint" style="margin-top:7px">콜타임 원문: <span style="color:var(--cy)">'+esc(e.callRaw.replace(/\n/g,' · ').slice(0,90))+'</span></div>':''}</div>
+    ${dayForecastCard(e)}
     <h3 class="sec">씬 — 페이지 ★ (${e.scenes.length}씬)</h3>
     <button class="btn block" style="margin:8px 0 4px" onclick="kindAll()">씬 성격·위치 유형 자동 제안 일괄 적용 — 미분류 씬만</button>
     <div class="hint" style="margin-bottom:8px">페이지 = 스케줄표 단위 소수 입력(반 페이지=0.5). 사전제작일지 씬 표에 「페이지」 열을 추가하면 자동으로 채워집니다. 셋업은 씬 기록 탭에서 자동 집계.</div>
@@ -1599,6 +1625,7 @@ function renderResult(e){
     document.getElementById('epBody').innerHTML=`
       <h3 class="sec">누적 분석 — ${CUMW===0?'전체 '+n+'회차':'최근 '+n+'회차'}</h3>${toggle}${wsel}
       ${cidxCum(win)}
+      ${ltPoolSection(win)}
       <h3 class="sec">산출량 (회 평균)</h3>
       <div class="fgrid">
         ${mcell('DPP · 페이지/회', fmtN(aDpp), 'p', 'var(--or)', ZONES.dpp(aDpp),'dpp')}
@@ -2282,7 +2309,7 @@ function cidxDay(e){
     <div class="rrow"><span>이동 전환 (연출부·제작)</span><b style="color:${tg.move>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.move)}분</b></div>
     <div class="rrow"><span><b>합계</b></span><b style="color:${tg.sum>=0?'var(--gn)':'var(--rd)'}">${sgn(tg.sum)}분</b></div>
     <div class="hint" style="margin-top:6px">풀 기준선 대비 득실(분). 분 × 분당 BTL 단가 = 원화 환산.</div></div>`;
-  return `<h3 class="sec">종합지수 (설계 v0.3.1)</h3>${selfRef}
+  return `${dayJudge(e)}<h3 class="sec">종합지수 (설계 v0.3.1)</h3>${selfRef}
     <div class="fgrid">
       ${mcell('PEI · 제작효율', fmt2(ix.pei), '', 'var(--gn)', null, 'pei')}
       ${mcell('DPS · 당일 속보', fmt2(ix.dps), '', 'var(--or)', null, 'dps')}
@@ -2526,6 +2553,391 @@ mlr:{n:'MLR',t:'Move Loss Ratio — 이동손실률',
   cv:c=>{ if(!c.e) return null; const m=metricsOf(c.e); return m.c2w? transOf(c.e).move/(m.c2w*60):null; },
   note:'가동률(순촬영÷콜투랩)의 손실분을 이동·대기·휴게로 분해할 때 이동 몫이 MLR이다. 구간 기준은 풀 축적 후 위치 유형 구성 보정과 함께 확정.',
   extra:c=>''}
+});
+
+/* ═════ v0.10 — 검토안 v0.3 구현 ═════
+   추이(이원 컷라인·팀 컷·라운드·누적 TG·PEI 추이·ECD) · 배우 비교(ATO·aTkG·산점도) · LT 유형 지문 · 당일 예상 */
+const ROUND=4;   /* 4회차 = 1라운드 (주 4회차 기본 — 검토안 v0.3 확정 E) */
+let TRW=8;       /* 추이 비교 창: 4 | 8 | 0(전체) */
+
+function recEps(){
+  return Object.keys(DB.episodes).sort().map(k=>({k,e:DB.episodes[k],m:metricsOf(DB.episodes[k])}))
+    .filter(x=>x.m.pgShot>0||x.m.hasLive);
+}
+function median(v){ if(!v.length) return null; const s=v.slice().sort((a,b)=>a-b), m=Math.floor(s.length/2);
+  return s.length%2? s[m] : (s[m-1]+s[m])/2; }
+function topPct(vals,x){ /* x가 (vals+자신) 중 상위 몇 %인가 — wTV 높을수록 좋음 */
+  if(x==null||!vals.length) return null;
+  const rank=1+vals.filter(y=>y>x).length;
+  return rank/(vals.length+1)*100;
+}
+function trendData(){
+  const pb=poolBase();
+  const eps=recEps().map(x=>({...x,ix:epIndices(x.e,pb)}));
+  let cA=0,cP=0;
+  eps.forEach(x=>{ x.pgA=(x.m.dppAdj!=null?x.m.dppAdj:(x.m.pgShot||0)); x.pgP=x.m.pgPlan||0;
+    cA+=x.pgA; cP+=x.pgP; x.cumA=cA; x.cumP=cP; });
+  const avgP=(eps.length&&cP>0)? cP/eps.length : null; /* 회차분 환산 분모 = 평균 계획 페이지 */
+  return {pb,eps,avgP};
+}
+function gapEp(td,i){ return (td.avgP&&td.eps[i])? (td.eps[i].cumA-td.eps[i].cumP)/td.avgP : null; }
+function cutOf(eps,i,w){ /* i번째 회차의 팀 컷 = 직전 창 wTV 중앙값 (자기 제외) */
+  const prev=eps.slice(0,i).map(x=>x.ix.wtv).filter(v=>v!=null);
+  return median(w===0? prev : prev.slice(-w));
+}
+/* 당일 결산 상단 한 줄 판정 — 상대(팀 컷) + 절대(계획) 병기. 창은 결산 누적 탭(CUMW) 공유 */
+function dayJudge(e){
+  const td=trendData(); const i=td.eps.findIndex(x=>x.e===e);
+  if(i<1) return '';
+  const prevAll=td.eps.slice(0,i).map(x=>x.ix.wtv).filter(v=>v!=null);
+  const prev=CUMW===0? prevAll : prevAll.slice(-CUMW);
+  const wtv=td.eps[i].ix.wtv;
+  if(!prev.length||wtv==null) return '';
+  const pct=topPct(prev,wtv), cut=median(prev), g=gapEp(td,i);
+  const up=wtv>=cut;
+  return `<div class="card" style="border-left:4px solid ${up?'var(--gn)':'var(--rd)'};margin-bottom:10px">
+    <div style="font-size:15px;line-height:1.5"><b style="color:${up?'var(--gn)':'var(--rd)'}">팀 컷 상위 ${pct.toFixed(0)}%</b>
+      <span style="color:var(--sub)">(${CUMW===0?'전체':'최근 '+prev.length+'회'} 창 · 컷 ${cut.toFixed(2)} / 오늘 wTV ${wtv.toFixed(2)})</span>${
+      g!=null? ' · 계획 대비 <b style="color:'+(g>=0?'var(--gn)':'var(--rd)')+'">'+(g>=0?'+':'')+g.toFixed(1)+'회차분</b>':''}</div>
+    <div class="hint" style="margin-top:4px">상대(팀 컷 — 팀 누적 연동) + 절대(계획 컷라인) 병기 · 검토안 v0.3. 판정 밴드는 R3 전 임시.</div></div>`;
+}
+/* SVG 유틸 */
+const CW=680;
+function xPos(i,n){ const pad=30; return n<=1? CW/2 : pad+i*(CW-2*pad)/(n-1); }
+function pathOf(pts){ return pts.length? 'M'+pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L '):''; }
+function chartCard(H,inner,hint){
+  return `<div class="card" style="padding:12px 8px 8px"><svg viewBox="0 0 ${CW} ${H}" style="width:100%;display:block">${inner}</svg>${hint?'<div class="hint" style="margin-top:6px;padding:0 6px">'+hint+'</div>':''}</div>`;
+}
+function xLabels(eps,H){
+  const n=eps.length, step=Math.max(1,Math.ceil(n/10));
+  return eps.map((x,i)=> (i%step===0||i===n-1)? `<text x="${xPos(i,n).toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="9" fill="#7C8794">${x.k.replace(/^A-/,'')}</text>`:'').join('');
+}
+function roundGrid(n,H){
+  let s=''; for(let r=ROUND;r<n;r+=ROUND){ const x=(xPos(r-1,n)+xPos(r,n))/2;
+    s+=`<line x1="${x.toFixed(1)}" y1="10" x2="${x.toFixed(1)}" y2="${H-18}" stroke="#232B37" stroke-dasharray="3 4"/>`; }
+  return s;
+}
+/* 완성 예측 (R1c 재사용 — 추이 화면용) */
+function forecastData(){
+  const s=DB.settings; if(!(s.totalPages>0)) return null;
+  const rec=recEps();
+  const shotAll=rec.reduce((a,x)=>a+(x.m.pgShot||0),0);
+  const remain=Math.max(0,s.totalPages-shotAll);
+  const dppOf=arr=>{const v=arr.map(x=>x.m.dpp).filter(x=>x!=null&&x>0);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
+  const dates=rec.map(x=>x.e.date).filter(Boolean).sort();
+  let fac=2.0, lastD=dates.length? new Date(dates[dates.length-1]) : new Date();
+  if(dates.length>=2){ fac=Math.max(1,(new Date(dates[dates.length-1])-new Date(dates[0]))/(dates.length-1)/86400000); }
+  const mk=(nm,d)=>{ if(!d) return {nm,rsd:null};
+    const rsd=Math.ceil(remain/d), ecd=new Date(lastD.getTime()+rsd*fac*86400000);
+    const delay=s.crankUp? Math.round((ecd-new Date(s.crankUp))/86400000) : null;
+    return {nm,rsd,ecd:ecd.toISOString().slice(0,10),delay}; };
+  return {pgr:shotAll/s.totalPages, remain,
+    scen:[mk('낙관 · 최근 4회 페이스',dppOf(rec.slice(-4))),mk('중립 · 최근 8회',dppOf(rec.slice(-8))),mk('보수 · 전체 평균',dppOf(rec))]};
+}
+/* 라운드 결산 (4회차 = 1라운드) */
+function roundRows(td){
+  const eps=td.eps, out=[];
+  for(let r=0;r*ROUND<eps.length;r++){
+    const seg=eps.slice(r*ROUND,(r+1)*ROUND), last=seg[seg.length-1];
+    const prevEnd=r*ROUND>0? eps[r*ROUND-1] : null;
+    const wv=seg.map(x=>x.ix.wtv).filter(v=>v!=null);
+    out.push({no:r+1, keys:seg[0].k+' ~ '+last.k, n:seg.length, full:seg.length===ROUND,
+      pg:seg.reduce((a,x)=>a+x.pgA,0),
+      tg:seg.reduce((a,x)=>a+(x.ix.tg?x.ix.tg.sum:0),0),
+      wtv:wv.length? wv.reduce((a,b)=>a+b,0)/wv.length : null,
+      gap:td.avgP? ((last.cumA-last.cumP)-(prevEnd?(prevEnd.cumA-prevEnd.cumP):0))/td.avgP : null});
+  }
+  return out;
+}
+function renderTrend(){
+  const bd=document.getElementById('trendBody');
+  const td=trendData(), eps=td.eps, n=eps.length;
+  if(n<2){ bd.innerHTML='<div class="card hint">기록 회차가 2개 이상 쌓이면 추이·컷라인이 표시됩니다. 홈에서 회차를 임포트하고 현장 기록을 진행하세요.</div>'; return; }
+  const wsel=`<div class="shotseg" style="margin-bottom:12px">
+    <button class="${TRW===4?'y':''}" onclick="TRW=4;renderTrend()">최근 4회</button>
+    <button class="${TRW===8?'y':''}" onclick="TRW=8;renderTrend()">최근 8회</button>
+    <button class="${TRW===0?'y':''}" onclick="TRW=0;renderTrend()">전체</button></div>`;
+  const sgn=v=>(v>0?'+':'')+v.toFixed(0);
+  /* ── 최근 회차 판정 (창 = TRW) ── */
+  const li=n-1, prevAll=eps.slice(0,li).map(x=>x.ix.wtv).filter(v=>v!=null);
+  const prev=TRW===0? prevAll : prevAll.slice(-TRW);
+  const lwtv=eps[li].ix.wtv;
+  let judge='';
+  if(prev.length&&lwtv!=null){
+    const pct=topPct(prev,lwtv), cut=median(prev), g=gapEp(td,li), up=lwtv>=cut;
+    judge=`<div class="card" style="border-left:4px solid ${up?'var(--gn)':'var(--rd)'}">
+      <div style="font-size:15px;line-height:1.5"><b>${esc(eps[li].k)}</b> — <b style="color:${up?'var(--gn)':'var(--rd)'}">팀 컷 상위 ${pct.toFixed(0)}%</b>
+        <span style="color:var(--sub)">(컷 ${cut.toFixed(2)} / wTV ${lwtv.toFixed(2)})</span>${
+        g!=null? ' · 계획 대비 <b style="color:'+(g>=0?'var(--gn)':'var(--rd)')+'">'+(g>=0?'+':'')+g.toFixed(1)+'회차분</b>':''}</div></div>`;
+  }
+  /* ── ① 컷라인 차트 (계획 — 고정 기준선) ── */
+  const H1=220, top1=16, bot1=34;
+  const max1=Math.max(eps[li].cumA,eps[li].cumP,1);
+  const y1=v=>top1+(1-v/max1)*(H1-top1-bot1);
+  const planPts=eps.map((x,i)=>[xPos(i,n),y1(x.cumP)]);
+  const actPts=eps.map((x,i)=>[xPos(i,n),y1(x.cumA)]);
+  const gLast=gapEp(td,li);
+  const cut1=`${roundGrid(n,H1)}
+    <path d="${pathOf(planPts)}" fill="none" stroke="#7C8794" stroke-width="1.8" stroke-dasharray="5 4"/>
+    <path d="${pathOf(actPts)}" fill="none" stroke="#FF7A00" stroke-width="2.6"/>
+    <circle cx="${actPts[li][0].toFixed(1)}" cy="${actPts[li][1].toFixed(1)}" r="4" fill="#FF7A00"/>
+    <text x="${(actPts[li][0]-6).toFixed(1)}" y="${(actPts[li][1]-8).toFixed(1)}" text-anchor="end" font-size="10.5" font-weight="700" fill="#FF7A00">실측 ${eps[li].cumA.toFixed(0)}p</text>
+    <text x="${(planPts[li][0]-6).toFixed(1)}" y="${(planPts[li][1]+14).toFixed(1)}" text-anchor="end" font-size="10" fill="#7C8794">계획 ${eps[li].cumP.toFixed(0)}p</text>
+    ${xLabels(eps,H1)}`;
+  /* ── ② 팀 컷 차트 (변동 기준선 — 팀 누적 연동) ── */
+  const wv=eps.map(x=>x.ix.wtv);
+  const wvAll=wv.filter(v=>v!=null);
+  let teamCut='';
+  if(wvAll.length>=2){
+    const H2=200, top2=14, bot2=30;
+    const lo=Math.min(...wvAll,1)-0.06, hi=Math.max(...wvAll,1)+0.06;
+    const y2=v=>top2+(1-(v-lo)/(hi-lo))*(H2-top2-bot2);
+    const cutPts=[]; for(let i=1;i<n;i++){ const c=cutOf(eps,i,TRW); if(c!=null) cutPts.push([xPos(i,n),y2(c)]); }
+    const dots=eps.map((x,i)=>{ if(wv[i]==null) return '';
+      const c=i>0? cutOf(eps,i,TRW):null;
+      const col=c==null? '#7C8794' : (wv[i]>=c? '#35C24D':'#E23A3A');
+      return `<circle cx="${xPos(i,n).toFixed(1)}" cy="${y2(wv[i]).toFixed(1)}" r="4.5" fill="${col}"/>`; }).join('');
+    teamCut=`${roundGrid(n,H2)}
+      <line x1="30" y1="${y2(1).toFixed(1)}" x2="${CW-30}" y2="${y2(1).toFixed(1)}" stroke="#3D4653" stroke-dasharray="2 5"/>
+      <text x="${CW-28}" y="${(y2(1)-4).toFixed(1)}" font-size="9" fill="#7C8794">1.0</text>
+      <path d="${pathOf(cutPts)}" fill="none" stroke="#00B7D9" stroke-width="2.2"/>
+      ${cutPts.length? `<text x="${(cutPts[cutPts.length-1][0]-6).toFixed(1)}" y="${(cutPts[cutPts.length-1][1]-8).toFixed(1)}" text-anchor="end" font-size="10" font-weight="700" fill="#00B7D9">팀 컷</text>`:''}
+      ${dots}${xLabels(eps,H2)}`;
+    teamCut=chartCard(200,teamCut,'점 = 회차 wTV(초록 = 컷 통과·빨강 = 컷 아래) · 청록 선 = 팀 컷(비교 창 중앙값 — 팀 성적에 연동해 이동) · 점선 = 기준 효율 1.0');
+  }
+  /* ── ③ 누적 TG 곡선 ── */
+  let cum=0; const cumTg=eps.map(x=>{ cum+=(x.ix.tg?x.ix.tg.sum:0); return cum; });
+  const H3=190, top3=14, bot3=30;
+  const lo3=Math.min(...cumTg,0), hi3=Math.max(...cumTg,0), span3=Math.max(hi3-lo3,30);
+  const y3=v=>top3+(1-(v-lo3)/span3)*(H3-top3-bot3);
+  const tgPts=eps.map((x,i)=>[xPos(i,n),y3(cumTg[i])]);
+  const tgSvg=`${roundGrid(n,H3)}
+    <line x1="30" y1="${y3(0).toFixed(1)}" x2="${CW-30}" y2="${y3(0).toFixed(1)}" stroke="#3D4653" stroke-dasharray="2 5"/>
+    <path d="${pathOf(tgPts)}" fill="none" stroke="${cumTg[li]>=0?'#35C24D':'#E23A3A'}" stroke-width="2.6"/>
+    <circle cx="${tgPts[li][0].toFixed(1)}" cy="${tgPts[li][1].toFixed(1)}" r="4" fill="${cumTg[li]>=0?'#35C24D':'#E23A3A'}"/>
+    <text x="${(tgPts[li][0]-6).toFixed(1)}" y="${(tgPts[li][1]-8).toFixed(1)}" text-anchor="end" font-size="10.5" font-weight="700" fill="${cumTg[li]>=0?'#35C24D':'#E23A3A'}">${sgn(cumTg[li])}분</text>
+    ${xLabels(eps,H3)}`;
+  /* ── ④ PEI 추이 + 이동평균 ── */
+  const pv=eps.map(x=>x.ix.pei);
+  const pvAll=pv.filter(v=>v!=null);
+  let peiCard='';
+  if(pvAll.length>=2){
+    const H4=190, top4=14, bot4=30;
+    const hi4=Math.max(...pvAll)*1.15||1;
+    const y4=v=>top4+(1-v/hi4)*(H4-top4-bot4);
+    const ma=eps.map((x,i)=>{ const from=TRW===0?0:Math.max(0,i-TRW+1);
+      const v=pv.slice(from,i+1).filter(z=>z!=null);
+      return v.length? v.reduce((a,b)=>a+b,0)/v.length : null; });
+    const peiPts=[], maPts=[];
+    eps.forEach((x,i)=>{ if(pv[i]!=null) peiPts.push([xPos(i,n),y4(pv[i])]); if(ma[i]!=null) maPts.push([xPos(i,n),y4(ma[i])]); });
+    const dots4=eps.map((x,i)=> pv[i]!=null? `<circle cx="${xPos(i,n).toFixed(1)}" cy="${y4(pv[i]).toFixed(1)}" r="4" fill="#FFD400"/>`:'').join('');
+    const uAvg=(f=>{const v=eps.slice(TRW===0?0:-TRW).map(f).filter(z=>z!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;});
+    const cu=uAvg(x=>x.ix.util), cp=uAvg(x=>x.ix.pace), cq=uAvg(x=>x.ix.q);
+    peiCard=chartCard(H4,`${roundGrid(n,H4)}
+      <path d="${pathOf(maPts)}" fill="none" stroke="#3D7BFF" stroke-width="2.2"/>
+      ${dots4}${xLabels(eps,H4)}`,
+      `점 = 회차 PEI · 파랑 선 = ${TRW===0?'누적':'최근 '+TRW+'회'} 이동평균 — 창 평균 성분: 가동 ${cu==null?'–':(cu*100).toFixed(0)}% × 페이스 ${cp==null?'–':cp.toFixed(2)} × 품질 ${cq==null?'–':(cq*100).toFixed(0)}%`);
+  }
+  /* ── ⑤ ECD 게이지 ── */
+  const fc=forecastData();
+  const ecd=fc? `<div class="card">
+      <div class="rrow"><span>진행률 PGR</span><b>${(fc.pgr*100).toFixed(1)}% · 잔여 ${fc.remain.toFixed(0)}p</b></div>
+      ${fc.scen.map(s=> s.rsd==null? `<div class="rrow"><span>${s.nm}</span><b>–</b></div>` :
+        `<div class="rrow"><span>${s.nm}</span><b>잔여 ${s.rsd}일 → ${s.ecd}${s.delay!=null? ` <span style="color:${s.delay>0?'var(--rd)':'var(--gn)'}">(${s.delay>0?'+':''}${s.delay}일)</span>`:''}</b></div>`).join('')}
+      <div class="hint" style="margin-top:6px">시나리오 정의가 비교 창(4·8·전체)과 일치 — 매 회차 자동 갱신되는 ETA.</div></div>`
+    : '<div class="card hint">작품 설정에 「대본 총 페이지」를 입력하면 예상 크랭크업(ECD)이 표시됩니다.</div>';
+  /* ── 라운드 결산 ── */
+  const rounds=roundRows(td);
+  const roundCard='<div class="card">'+rounds.map(r=>{
+    const up=r.gap!=null? r.gap>=0 : null;
+    return `<div class="rrow"><span><b>R${r.no}</b> ${esc(r.keys)}${r.full?'':' <span class="pill warn">진행 중 '+r.n+'/'+ROUND+'</span>'}</span>
+      <b>${r.pg.toFixed(1)}p · wTV ${r.wtv==null?'–':r.wtv.toFixed(2)} · TG ${sgn(r.tg)}분${r.gap!=null? ' · <span style="color:'+(up?'var(--gn)':'var(--rd)')+'">'+(r.gap>=0?'+':'')+r.gap.toFixed(1)+'회차분</span>':''}</b></div>`;
+  }).join('')+'<div class="hint" style="margin-top:6px">4회차 = 1라운드(주 4회차 기본) · 회차분 = 계획 대비 득실 ÷ 평균 계획 페이지. 골프 라운드 스코어카드 문법.</div></div>';
+  const selfRef=td.pb.n<10? '<div class="hint" style="margin-bottom:8px">풀 '+td.pb.n+'회차 — 기준선은 자기 풀 임시값(10회차부터 정식).</div>':'';
+  bd.innerHTML=`
+    <h3 class="sec">비교 창</h3>${wsel}${selfRef}${judge}
+    <h3 class="sec">① 컷라인 — 계획 대비 (고정 기준선)</h3>
+    ${chartCard(H1,cut1,'주황 = 누적 실측(SDI 보정 페이지) · 회색 점선 = 사전제작일지 계획 누적 · 세로 점선 = 라운드 경계'+(gLast!=null? ' — 현재 <b style="color:'+(gLast>=0?'var(--gn)':'var(--rd)')+'">'+(gLast>=0?'+':'')+gLast.toFixed(1)+'회차분</b>':''))}
+    <h3 class="sec">② 팀 컷 — 팀 누적 연동 (변동 기준선)</h3>
+    ${teamCut||'<div class="card hint">wTV 산출 회차가 2개 이상 쌓이면 표시됩니다.</div>'}
+    <h3 class="sec">③ 누적 TG — 시즌이 시간을 이기고 있는가</h3>
+    ${chartCard(H3,tgSvg,'회차별 ΣTG의 누적(분) · 0선 위 = 풀 기준선보다 빠른 시즌')}
+    <h3 class="sec">④ PEI 추이</h3>
+    ${peiCard||'<div class="card hint">PEI 산출 회차가 2개 이상 쌓이면 표시됩니다.</div>'}
+    <h3 class="sec">⑤ 예상 크랭크업 — ECD</h3>
+    ${ecd}
+    <h3 class="sec">라운드 결산</h3>
+    ${roundCard}
+    <div class="hint" style="margin-top:4px">이원 컷라인(검토안 v0.3 확정 F): 계획 = 절대 판정 「작품이 계획대로 끝나는가」 · 팀 컷 = 상대 판정 「오늘이 우리 기준으로 어땠나」. 판정 밴드 값은 R3 백테스트 전 임시.</div>`;
+}
+/* ── 배우 비교 (검토안 v0.3 2장 — ATO·aTkG·산점도) ── */
+function kindBaseTakes(){
+  const by={}, all={tk:0,n:0};
+  recEps().forEach(({e})=>{ (e.scenes||[]).forEach(x=>{
+    if(x.shot!=='Y') return; const st=recStats(x);
+    if(st.legacy||!st.takes) return;
+    const k=x.kind||'ETC';
+    if(!by[k]) by[k]={tk:0,n:0};
+    by[k].tk+=st.takes; by[k].n++; all.tk+=st.takes; all.n++;
+  });});
+  const o={}; Object.entries(by).forEach(([k,v])=>{ if(v.n>0) o[k]=v.tk/v.n; });
+  return {byKind:o, all: all.n>0? all.tk/all.n : null};
+}
+function actorPool(){
+  const base=kindBaseTakes(); if(base.all==null) return [];
+  const map={};
+  recEps().forEach(({e})=>{
+    migrate(e);
+    (e.cast||[]).forEach(c=>{ if(!map[c.name]) map[c.name]={name:c.name,scenes:0,takes:0,ok:0,ng01:0,ftc:0,setups:0,tkg:0,tkgN:0}; });
+    (e.scenes||[]).forEach(x=>{
+      if(x.shot!=='Y') return; const st=recStats(x);
+      if(st.legacy||!st.takes) return;
+      const bk=base.byKind[x.kind||'ETC']??base.all;
+      Object.keys(map).forEach(nm=>{ if(!x.cast||!x.cast.includes(nm)) return; const a=map[nm];
+        a.scenes++; a.takes+=st.takes; a.ok+=st.ok; a.ng01+=(st.ng['01']||0); a.ftc+=st.ftc; a.setups+=st.setups;
+        if(bk!=null){ a.tkg+=st.takes-bk; a.tkgN++; }
+      });
+    });
+  });
+  return Object.values(map).filter(a=>a.takes>0).map(a=>({...a,
+    aNGR:a.takes? a.ng01/a.takes:null,
+    aFTC:a.setups? a.ftc/a.setups:null,
+    ato:a.ok? a.takes/a.ok:null,
+    atkg:a.tkgN? a.tkg/a.tkgN:null,
+    rps:(a.setups&&a.takes)? a.ftc/a.setups+(1-a.ng01/a.takes):null }));
+}
+function renderActors(){
+  const bd=document.getElementById('actorsBody');
+  const as=actorPool().filter(a=>a.aFTC!=null&&a.aNGR!=null);
+  if(!as.length){ bd.innerHTML='<div class="card hint">씬 기록(테크트리)이 있는 배우가 없습니다. 씬 기록 탭에서 테이크를 기록하면 자동 집계됩니다.</div>'; return; }
+  /* 산점도 — X 준비율(aFTC) · Y 완성률(1−aNGR) */
+  const H=380, padL=46, padR=20, padT=18, padB=36;
+  const xs=as.map(a=>a.aFTC), ys=as.map(a=>1-a.aNGR);
+  const mx=v=>padL+v*(CW-padL-padR), my=v=>padT+(1-v)*(H-padT-padB);
+  const avgX=xs.reduce((a,b)=>a+b,0)/xs.length, avgY=ys.reduce((a,b)=>a+b,0)/ys.length;
+  const maxTk=Math.max(...as.map(a=>a.takes),1);
+  const dots=as.map(a=>{
+    const r=5+Math.sqrt(a.takes/maxTk)*9;
+    const solid=a.takes>=100;
+    const col=solid? (a.aFTC>=avgX? (1-a.aNGR>=avgY?'#35C24D':'#FFD400') : (1-a.aNGR>=avgY?'#00B7D9':'#E23A3A')) : '#55606d';
+    return `<circle cx="${mx(a.aFTC).toFixed(1)}" cy="${my(1-a.aNGR).toFixed(1)}" r="${r.toFixed(1)}" fill="${col}" opacity="${solid?0.92:0.45}"/>
+      ${solid? `<text x="${mx(a.aFTC).toFixed(1)}" y="${(my(1-a.aNGR)-r-4).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#F2F5F8">${esc(a.name)}</text>`:''}`;
+  }).join('');
+  const scatter=`
+    <line x1="${mx(avgX).toFixed(1)}" y1="${padT}" x2="${mx(avgX).toFixed(1)}" y2="${H-padB}" stroke="#3D4653" stroke-dasharray="3 4"/>
+    <line x1="${padL}" y1="${my(avgY).toFixed(1)}" x2="${CW-padR}" y2="${my(avgY).toFixed(1)}" stroke="#3D4653" stroke-dasharray="3 4"/>
+    <text x="${CW-padR-4}" y="${padT+12}" text-anchor="end" font-size="10" fill="#35C24D" font-weight="800">안정형</text>
+    <text x="${padL+4}" y="${padT+12}" font-size="10" fill="#00B7D9" font-weight="800">뒷심형</text>
+    <text x="${CW-padR-4}" y="${H-padB-6}" text-anchor="end" font-size="10" fill="#FFD400" font-weight="800">선방형</text>
+    <text x="${padL+4}" y="${H-padB-6}" font-size="10" fill="#E23A3A" font-weight="800">과제</text>
+    ${dots}
+    <text x="${((padL+CW-padR)/2).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="10" fill="#7C8794">준비율 aFTC → (첫 테이크에 끝내는가)</text>
+    <text x="14" y="${((padT+H-padB)/2).toFixed(1)}" text-anchor="middle" font-size="10" fill="#7C8794" transform="rotate(-90 14 ${((padT+H-padB)/2).toFixed(1)})">완성률 1−aNGR ↑</text>`;
+  /* 정렬 카드 — aTkG 순 (낮을수록 좋음) */
+  const sorted=as.slice().sort((a,b)=>{
+    if(a.takes>=100&&b.takes<100) return -1; if(b.takes>=100&&a.takes<100) return 1;
+    return (a.atkg??9)-(b.atkg??9); });
+  const list='<div class="card">'+sorted.map(a=>{
+    const low=a.takes<100;
+    const tk=a.atkg==null?'–':(a.atkg>0?'+':'')+a.atkg.toFixed(2);
+    return `<div class="rrow"${low?' style="opacity:.55"':''}><span><b>${esc(a.name)}</b> ${a.takes}테이크${low?' <span class="pill warn">저신뢰</span>':''}</span>
+      <b>aTkG <span style="color:${a.atkg!=null&&a.atkg<=0?'var(--gn)':'var(--rd)'}">${tk}/씬</span> · ATO ${a.ato==null?'–':a.ato.toFixed(1)}tk · aRPS ${a.rps==null?'–':a.rps.toFixed(2)}</b></div>`;
+  }).join('')+'</div>';
+  bd.innerHTML=`
+    <h3 class="sec">준비율 × 완성률 — 4분면 (누적 전체)</h3>
+    ${chartCard(H,scatter,'점 크기 = 누적 테이크 · 교차선 = 풀 평균 · 회색 점 = 100테이크 미만(저신뢰 — 이름 생략, 목록에서 확인)')}
+    <h3 class="sec">aTkG — 기준 타수 대비 테이크 득실 (낮을수록 좋음)</h3>
+    ${list}
+    <div class="card hint">aTkG = Σ(씬 실측 테이크 − 그 씬 성격의 풀 평균 테이크) ÷ 출연 씬 — 씬 성격 난이도 보정 내장(EMO가 많은 주연이 불리하지 않음). ATO = 총 테이크 ÷ OK 테이크. 표시는 캐릭터 이름(확정 B) — 개인 지표는 거버넌스 6원칙(본인 열람 우선·외부 공개 금지·인사 직접 사용 금지). NG 기록 정의 통일 전에는 절대값 해석 보류.</div>`;
+}
+/* ── LT 유형 지문 (누적 — 검토안 v0.3 1-1) ── */
+function ltPoolSection(win){
+  const blank=()=>({scenes:0,pg:0,pgAdj:0,h:0,takes:0,ng:0,suMin:0,suN:0,mv:0});
+  const o={};
+  win.forEach(w=>{ const e=DB.episodes[w.k]; if(!e) return;
+    transOf(e).rows.forEach(r=>{ if(!r.moved) return; const k=ltOf(r.to)||'미지정';
+      if(!o[k]) o[k]=blank(); o[k].mv+=r.min; });
+    (e.scenes||[]).forEach(x=>{
+      if(x.shot!=='Y') return; const k=ltOf(x)||'미지정';
+      if(!o[k]) o[k]=blank();
+      const b=o[k], st=recStats(x), pEff=(x.pagesA??x.pages)||0;
+      b.scenes++; b.pg+=pEff; b.pgAdj+=pEff*sceneW(x);
+      const dh=hdiff(x.tStart,x.tEnd); if(dh!=null) b.h+=dh;
+      if(!st.legacy){ b.takes+=st.takes; b.ng+=st.ngSum; }
+      if(st.suMin) st.suMin.forEach(mn=>{b.suMin+=mn;b.suN++;});
+    });
+  });
+  const ks=Object.entries(o).filter(([,b])=>b.scenes>0);
+  if(!ks.length) return '';
+  const rows=ks.sort((a,b)=>b[1].pg-a[1].pg).map(([k,b])=>{
+    const pace=b.h>0? (b.pgAdj/b.h).toFixed(2)+' p/h':'–';
+    const low=b.scenes<5;
+    return `<div class="rrow"><span><b>${LTN[k]||k}</b> ${b.scenes}씬 · ${b.pg.toFixed(1)}p${low?' <span class="pill warn">저신뢰</span>':''}</span>
+      <b>보정 페이스 ${pace} · 셋업 ${b.suN?(b.suMin/b.suN).toFixed(0)+'분':'–'} · NG ${b.takes?Math.round(b.ng/b.takes*100)+'%':'–'} · 이동 ${Math.round(b.mv)}분</b></div>`;
+  }).join('');
+  return `<h3 class="sec">장소 — LT 유형 지문 (집계 창)</h3><div class="card">${rows}
+    <div class="hint" style="margin-top:6px">팀의 위치 유형별 실측 지문 — 페이스는 씬 성격(SDI) 보정 p/h · 이동 = 해당 유형 진입 전환분 귀속. 5씬 미만 유형은 저신뢰(검토안 v0.3 1장).</div></div>`;
+}
+/* ── 당일 예상 (기초 탭 — 검토안 v0.3 1-2) ── */
+function dayForecastCard(e){
+  if(!(e.scenes||[]).length) return '';
+  const pool=recEps().filter(x=>x.e!==e);
+  if(!pool.length) return '';
+  const pb=poolBase();
+  const agg={}; let allAdj=0, allH=0, utilS=0, utilN=0;
+  pool.forEach(x=>{
+    const u=epIndices(x.e,pb).util; if(u!=null){ utilS+=u; utilN++; }
+    (x.e.scenes||[]).forEach(scn=>{
+      if(scn.shot!=='Y') return;
+      const k=ltOf(scn)||'미지정', pEff=(scn.pagesA??scn.pages)||0, dh=hdiff(scn.tStart,scn.tEnd);
+      if(!agg[k]) agg[k]={adj:0,h:0,n:0};
+      agg[k].adj+=pEff*sceneW(scn); if(dh!=null) agg[k].h+=dh; agg[k].n++;
+      allAdj+=pEff*sceneW(scn); if(dh!=null) allH+=dh;
+    });
+  });
+  const allPace=allH>0? allAdj/allH : null;
+  if(!allPace) return '';
+  const grp={}; let anyLow=false, needH=0;
+  (e.scenes||[]).forEach(scn=>{ if(scn.shot==='N') return;
+    const k=ltOf(scn)||'미지정', pEff=(scn.pagesA??scn.pages)||0;
+    if(!grp[k]) grp[k]={adj:0,pg:0,n:0};
+    grp[k].adj+=pEff*sceneW(scn); grp[k].pg+=pEff; grp[k].n++; });
+  const rows=Object.entries(grp).sort((a,b)=>b[1].adj-a[1].adj).map(([k,g])=>{
+    const a=agg[k], okS=a&&a.n>=5&&a.h>0;
+    const pace=okS? a.adj/a.h : allPace; if(!okS) anyLow=true;
+    const h=pace>0? g.adj/pace : 0; needH+=h;
+    return `<div class="rrow"><span><b>${LTN[k]||k}</b> ${g.n}씬 · ${g.pg.toFixed(1)}p</span>
+      <b>${okS?'':'<span class="pill warn" style="margin-right:4px">전체 평균 대체</span>'}${pace.toFixed(2)} p/h → ${h.toFixed(1)}h</b></div>`;
+  }).join('');
+  const util=utilN? utilS/utilN : null;
+  const call=e.plan.call||e.plan.gather;
+  let wrap='–';
+  if(call&&util>0&&needH>0){
+    const mEnd=toMin(call)+Math.round(needH/util*60);
+    wrap=String(Math.floor((mEnd%1440)/60)).padStart(2,'0')+':'+String(mEnd%60).padStart(2,'0')+(mEnd>=1440?' (+1일)':'');
+  }
+  return `<h3 class="sec">당일 예상 — 팀 실측 페이스 (v0.10)</h3><div class="card">${rows}
+    <div class="rrow" style="border-top:1px solid var(--line)"><span><b>예상 순촬영</b></span><b style="color:var(--cy)">${needH.toFixed(1)}h</b></div>
+    <div class="rrow"><span><b>예상 랩</b> — 콜 ${call||'–'} · 풀 가동률 ${util?(util*100).toFixed(0)+'%':'–'} 적용</span><b style="color:var(--or)">${wrap}</b></div>
+    <div class="hint" style="margin-top:6px">당일 씬의 (위치 유형 × 씬 성격 SDI) 구성에 팀 누적 실측 페이스를 적용한 예고 — 검토안 v0.3 1-2.${anyLow?' 표본 5씬 미만 유형은 전체 평균으로 대체.':''}</div></div>`;
+}
+/* v0.10 — 지수 사전 추가 */
+Object.assign(MX,{
+tcut:{n:'팀 컷',t:'팀 컷라인 — 팀 누적 성적 연동 변동 기준선 (검토안 v0.3)',
+  d:'골프의 컷이 필드 성적에 연동해 오르내리듯, 비교 창(최근 4·8회/전체) 회차 스코어(wTV) 분포의 중앙값을 당일 판정의 기준선으로 쓴다. 팀이 좋아지면 컷도 올라간다 — 성장 압력이 문법에 내장된다.',
+  f:'팀 컷 = median(비교 창 wTV) · 당일 판정 = 상위 백분위',
+  zs:null,g:null,fmt:fmt2,cv:c=>null,
+  note:'자기 연동 컷은 팀 전체가 부진하면 같이 내려간다 — 절대 판정은 계획 컷라인이 담당하며 두 판정을 병기한다. 밴드(상위/중위/하위)는 R3 전 임시.',extra:c=>''},
+ato:{n:'ATO',t:'Average Takes to OK — 평균 OK 소요 테이크',
+  d:'총 테이크를 OK 테이크 수로 나눈 값. 「평균 2.3테이크에 OK」 — 현장 언어 그대로이며 낮을수록 좋다. 골프의 평균 타수에 해당하는 기초 수치.',
+  f:'ATO = 총 테이크 ÷ OK 테이크',
+  zs:null,g:null,fmt:v=>v==null?'–':v.toFixed(1),cv:c=>null,
+  note:'정식 판독은 누적 100테이크부터. NG 기록 정의 통일 전에는 절대값 해석 보류.',extra:c=>''},
+atkg:{n:'aTkG',t:'배우 테이크 득실 — 기준 타수 대비 스코어 (검토안 v0.3)',
+  d:'씬 성격별 풀 평균 테이크를 「기준 타수」로 삼아, 출연 씬의 실측 테이크와의 차이를 합산해 씬당으로 나눈 값. 음수가 좋다(기준보다 적게 씀). EMO가 많은 주연이 불리해지지 않는 난이도 보정이 기준선에 내장된다.',
+  f:'aTkG = Σ(실측 테이크 − 씬 성격별 풀 평균) ÷ 출연 씬',
+  zs:null,g:null,fmt:v=>v==null?'–':(v>0?'+':'')+v.toFixed(2),cv:c=>null,
+  note:'aTkG는 테이크 단위의 원인, 배우 TG는 분 단위의 결과 — 같은 사건의 두 해상도. 거버넌스 6원칙 적용.',extra:c=>''}
 });
 
 /* ---------- 합계 바 ---------- */
